@@ -64,7 +64,7 @@ services:
       - huasenNetwork
 
   nginx:
-    # 使用ottps实现SSL专用nginx镜像
+    # 使用ohttps实现SSL专用nginx镜像
     # image: ohttps/ohttps-nginx
     image: nginx:1.23.1
     container_name: nginx
@@ -74,11 +74,13 @@ services:
       - ./huasen-nginx/www:/home/www
       - ./huasen-nginx/log:/var/log/nginx
       - ./huasen-nginx/html:/usr/share/nginx/html
+    # <nginx-port-sh-anchor>
     ports:
-      # 宿主机:容器
+      # 宿主机端口:容器端口
       - 80:80
-      # 开启https
+      # 使用ohttps开启https
       # - 443:443
+    # </nginx-port-sh-anchor>
     environment:
       - TZ=Asia/Shanghai
       # ohttps部署节点id

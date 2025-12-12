@@ -12,11 +12,66 @@ gitStoragePath="https://gitee.com/HuaSenJioJio/huasenjio-compose.git"
 # 缓存目录
 tempPath=$sh_path"/../../huasen-temp"
 
+# 系统类型变量
+OS_TYPE=""
+OS_VERSION=""
+
+if [ "$(id -u)" != "0" ]; then
+    echo "[Huasen Log]：请以root用户运行脚本，避免权限不足产生异常问题！"
+    exit 1
+fi
+
+echo '[Huasen Log]：正在检测操作系统环境...'
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$ID
+    VERSION=$VERSION_ID
+else
+    echo "[Huasen Log]：无法检测操作系统类型，已停止脚本执行！"
+    exit 1
+fi
+
+# 定义包管理器行为
+case "$OS" in
+    centos|rhel|almalinux|rocky|opencloudos)
+        PM="yum"
+        PM_INSTALL="yum install -y"
+        PM_REMOVE="yum remove -y"
+        FAMILY="el"
+        ;;
+    ubuntu|debian)
+        PM="apt-get"
+        PM_INSTALL="apt-get install -y"
+        PM_REMOVE="apt-get remove -y"
+        FAMILY="debian"
+        ;;
+    *)
+        echo "[Huasen Log]：不支持的操作系统: $OS"
+        exit 1
+        ;;
+esac
+echo "[Huasen Log]：检测到系统: $OS $VERSION (Family: $FAMILY)"
+
+install_dependencies() {
+    echo "[Huasen Log]：正在检查并安装依赖工具..."
+
+    if ! command -v rsync &> /dev/null; then
+        echo "[Huasen Log]：正在安装 Rsync..."
+        $PM_INSTALL rsync
+    fi
+}
+
 save_current_nginx_port() {
     local compose_file="$projectPath/docker-compose.yml"
     if [ -f "$compose_file" ]; then
-        # 提取 nginx 宿主机端口
-        current_port=$(grep -A 10 'nginx:' "$compose_file" | grep -E '^\s*-\s*[0-9]+:80\s*$' | head -1 | sed -E 's/^\s*-\s*([0-9]+):80\s*$/\1/')
+        current_port=$(awk '/# <nginx-port-sh-anchor>/,/# <\/nginx-port-sh-anchor>/ {
+            if ($0 ~ /- [0-9]+:80/) {
+                sub(/.*- /, "")
+                sub(/:80.*/, "")
+                print
+                exit
+            }
+        }' "$compose_file")
         if [ -n "$current_port" ]; then
             echo "$current_port" > "$tempPath/current_nginx_port"
             echo "[Huasen Log]：当前 nginx 端口: $current_port"
@@ -39,8 +94,8 @@ ask_nginx_port() {
         current_nginx_port="80"
     fi
     
-    echo "[Huasen Log]：当前花森起始页网关配置端口为 $current_nginx_port，如需修改为其他端口？建议输入 1024-65535，例如：8282，并且避免与其他服务冲突。若直接回车，则保持不变。请输入内容（端口或直接回车）："
-    read -r nginx_port
+    echo "[Huasen Log]：当前花森起始页网关配置端口为 $current_nginx_port，如需修改为其他端口？建议输入 1024-65535，例如：8282，并且避免与其他服务冲突。若直接回车，则保持不变。"
+    read -p "[Huasen Log]：请输入端口号：" nginx_port
 
     if [ -n "$nginx_port" ]; then
         echo "[Huasen Log]：正在修改 nginx 端口为 $nginx_port:80 ..."
@@ -123,6 +178,7 @@ restart_program() {
 }
 
 main() {
+    install_dependencies
     run_backup_script
     init_cache_dir
     save_current_nginx_port

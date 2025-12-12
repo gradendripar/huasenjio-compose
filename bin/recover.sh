@@ -13,11 +13,15 @@ mirror1="https://docker.m.daocloud.io"
 mirror2="https://dockerproxy.com"
 mirror3="https://registry.docker-cn.com"
 
+# docker-compose 下载地址（依赖于 OS 类型和 CPU 架构）
 docker_compose_url="https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)"
 docker_compose_path="/usr/local/bin/docker-compose"
 
+echo '[Huasen Log]：脚本仅支持 CentOS 7/8、OpenCloudOS 9.x、Debian 12、Ubuntu 22，并且请确保 80（nginx）、37017（mongodb）、7379（redis）、3000（服务）、8181（websocket） 端口不被占用，如出现问题，请添加微信：huasencc，加入社群寻求帮助...'
 
-echo '[Huasen Log]：脚本已初始化完成，请确保 80、37017、7379、3000、8181 端口不被占用，如出现问题，请添加微信：huasencc，然后进群寻求帮助...'
+# 系统类型变量
+OS_TYPE=""
+OS_VERSION=""
 
 # 检查是否为root用户运行
 if [ "$(id -u)" != "0" ]; then
@@ -25,92 +29,131 @@ if [ "$(id -u)" != "0" ]; then
     exit 1
 fi
 
-# 更新yum源为阿里云源
-update_yum_repo() {
-    echo '[Huasen Log]：正在安装基础工具...'
-    curl -o /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-7.repo
-    yum -y install vim* yum-utils
-}
+echo '[Huasen Log]：正在检测操作系统环境...'
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$ID
+    VERSION=$VERSION_ID
+else
+    echo "[Huasen Log]：无法检测操作系统类型，已停止脚本执行！"
+    exit 1
+fi
 
-# 安装指定的软件包
-install_package() {
-    local package="$1"
-    if yum list installed "$package" &>/dev/null; then
-        echo "[Huasen Log]：$package is already installed"
-    else
-        yum install -y "$package"
+# 定义包管理器行为
+case "$OS" in
+    centos|rhel|almalinux|rocky|opencloudos)
+        PM="yum"
+        PM_INSTALL="yum install -y"
+        PM_REMOVE="yum remove -y"
+        FAMILY="el"
+        ;;
+    ubuntu|debian)
+        PM="apt-get"
+        PM_INSTALL="apt-get install -y"
+        PM_REMOVE="apt-get remove -y"
+        FAMILY="debian"
+        ;;
+    *)
+        echo "[Huasen Log]：不支持的操作系统: $OS"
+        exit 1
+        ;;
+esac
+echo "[Huasen Log]：检测到系统: $OS $VERSION (Family: $FAMILY)"
+
+prepare_environment() {
+    echo '[Huasen Log]：正在更新软件源并安装基础工具...'
+    
+    if [ "$FAMILY" = "el" ]; then
+        $PM_INSTALL curl git
+        # 仅针对 CentOS 7 进行源替换，CentOS 8/OpenCloudOS 保持系统默认或用户自行配置
+        if [ "$OS" = "centos" ] && [ "${VERSION:0:1}" = "7" ]; then
+            curl -o /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-7.repo
+        fi
+        
+    elif [ "$FAMILY" = "debian" ]; then
+        $PM update -y
+        $PM_INSTALL curl git gnupg lsb-release ca-certificates
     fi
 }
 
-# 安装 git
 install_git() {
-    # 检查是否已经安装了git
-    if which git > /dev/null 2>&1; then
-        echo '[Huasen Log]：git 已经安装，跳过安装步骤...'
+    echo '[Huasen Log]：检查 Git 环境...'
+    if command -v git >/dev/null 2>&1; then
+        echo '[Huasen Log]：Git 已存在'
     else
-        echo '[Huasen Log]：正在安装 git 程序...'
-        install_package "http://opensource.wandisco.com/centos/7/git/x86_64/wandisco-git-release-7-2.noarch.rpm"
-        install_package "git"
+        echo '[Huasen Log]：正在安装 Git...'
+        $PM_INSTALL git
     fi
-    # 检查git版本
     git version
 }
 
-# 安装 docker
 install_docker() {
-    echo '[Huasen Log]：正在安装 docker 程序...'
-    if ! command -v docker &>/dev/null; then
-        yum remove -y docker*
-        install_package "device-mapper-persistent-data"
-        install_package "lvm2"
-        yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
-        yum makecache fast
-        install_package "docker-ce"
-        systemctl start docker.service
-        systemctl enable docker.service
-        chmod a+rw /var/run/docker.sock
-        docker version
-    else
-        echo '[Huasen Log]：docker 已存在，不再重复安装！'
+    echo '[Huasen Log]：检查 Docker 环境...'
+    if command -v docker >/dev/null 2>&1; then
+        echo '[Huasen Log]：Docker 已存在'
+        return
     fi
+    
+    $PM_REMOVE docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine || true
+    
+    echo '[Huasen Log]：正在安装 Docker...'
+    if [ "$FAMILY" = "el" ]; then
+        if [ "$OS" = "opencloudos" ]; then
+            echo "[Huasen Log]：OpenCloudOS 9.x 跳过镜像源替换"
+            $PM makecache
+            $PM_INSTALL docker-ce docker-ce-cli containerd.io
+        elif [ "${VERSION:0:1}" = "7" ]; then
+            curl -o /etc/yum.repos.d/docker-ce.repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+            $PM makecache
+            $PM_INSTALL "device-mapper-persistent-data"
+            $PM_INSTALL "lvm2"
+            $PM_INSTALL "docker-ce"
+        elif [ "${VERSION:0:1}" = "8" ]; then
+            echo "[Huasen Log]：请选择腾讯云的 Docker CE 源，不要使用阿里云，因为出现报错：Cannot download Packages/containerd.io-1.6.32-3.1.el8.x86_64.rpm: All mirrors were tried，导致 docker 安装失败！"
+            bash <(curl -sSL https://linuxmirrors.cn/docker.sh)
+        fi
+    elif [ "$FAMILY" = "debian" ]; then
+        curl -fsSL "https://get.docker.com" -o get-docker.sh
+        chmod u+x get-docker.sh
+        sh get-docker.sh --mirror Aliyun
+    fi
+    systemctl start docker
+    systemctl enable docker
+    chmod a+rw /var/run/docker.sock
+    docker version
 }
 
-# 配置 docker 镜像源
 configure_docker() {
     if [ ! -f "$daemon_file" ]; then
+        mkdir -p /etc/docker
         echo '{"registry-mirrors":["'$mirror1'","'$mirror2'","'$mirror3'"],"ipv6":false}' > $daemon_file
-        echo "[Huasen Log]：Created $daemon_file and added mirrors"
+        echo "[Huasen Log]：已创建 $daemon_file 并添加镜像源"
     else
-        # 判断配置文件中是否已经存在镜像源
         if grep -q "$mirror1" "$daemon_file" && grep -q "$mirror2" "$daemon_file" && grep -q "$mirror3" "$daemon_file"; then
-            echo "The mirrors already exist in $daemon_file"
+            echo "[Huasen Log]：镜像源已配置"
         else
-            # 追加镜像源
-            sed -i '/registry-mirrors/ s/\[/\[\"'$mirror1'\",\"'$mirror2'\",\"'$mirror3'\",/' $daemon_file
-            echo "[Huasen Log]：Added mirrors to $daemon_file"
+            echo "[Huasen Log]：检测到 /etc/docker/daemon.json 存在但未包含默认镜像源，为保证安全不自动修改，如果拉取 docker 镜像失败，请手动检查并更改为可用镜像源。"
         fi
     fi
-
     systemctl daemon-reload
     systemctl restart docker
 }
 
-# 安装 docker-compose
 install_docker_compose() {
     echo '[Huasen Log]：安装 docker-compose 程序...'
     if [ ! -f "$docker_compose_path" ]; then
-        echo "[Huasen Log]：Downloading docker-compose..."
+        echo "[Huasen Log]：正在下载 docker-compose..."
         if curl -L "$docker_compose_url" -o "$docker_compose_path"; then
             chmod +x "$docker_compose_path"
-            echo "[Huasen Log]：docker-compose downloaded successfully"
+            echo "[Huasen Log]：docker-compose 下载完成"
         else
-            echo "[Huasen Log]：Failed to download docker-compose"
+            echo "[Huasen Log]：下载 docker-compose 失败"
             exit 1
         fi
     else
-        echo "[Huasen Log]：docker-compose is already downloaded"
+        echo "[Huasen Log]：docker-compose 已存在"
     fi
-    # 检测 docker-compose 软链接
+
     if [ ! -L "/usr/bin/docker-compose" ]; then
         ln -s "$docker_compose_path" /usr/bin/docker-compose
         echo "[Huasen Log]：Symbolic link /usr/bin/docker-compose has been created"
@@ -133,12 +176,12 @@ start_containers() {
 setup_shortcut_scripts() {
     echo '[Huasen Log]：为快捷脚本设置执行权限...'
     chmod u+x ./bin/*
-    echo '[Huasen Log]：花森网站已安装成功，请用浏览器访问站点：http://服务器IP/portal/，即可访问导航站点，详细信息可查阅：https://github.com/huasenjio/huasenjio-compose，期待您的关注！'
+    echo '[Huasen Log]：花森网站已恢复成功，详细信息可查阅：https://github.com/huasenjio/huasenjio-compose ，期待您的关注！'
 }
 
 # 主执行函数
 main() {
-    update_yum_repo
+    prepare_environment
     install_git
     install_docker
     configure_docker
@@ -147,9 +190,5 @@ main() {
     setup_shortcut_scripts
 }
 
-if grep -qE "CentOS Linux release 7." /etc/*release; then
-    main
-else
-    echo "[Huasen Log]：当前操作系统不是CentOS 7.x，已停止安装..."
-    exit 1
-fi
+main
+
