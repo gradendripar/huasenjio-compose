@@ -1,7 +1,7 @@
 {
-  "name": "huasen-page",
+  "name": "huasenjio-compose",
   "version": "1.0.0",
-  "description": "a docker-compose app",
+  "description": "a docker-compose app for huasenjio",
   "author": "huasen",
   "license": "MIT",
   "dependencies": {
