@@ -224,7 +224,7 @@
 
 #### 🏁 流程
 
-**脚本仅适用 CentOS 7/8、OpenCloudOS 9.x、Debian 12、Ubuntu 22 系统**，部署安装非常简单，进入服务器终端，执行`curl -O https://www.huasenjio.top/huasen-store/open-sh/install.sh ; chmod +x install.sh ; ./install.sh`命令，下载安装脚本并且执行。如果运行失败，重新运行即可。如有疑问，请务必查阅 `huasenjio-compose/bin/readme.md` 文档。
+**脚本仅适用 CentOS 7/8、OpenCloudOS 9.x、Debian 12、Ubuntu 22 系统**，部署安装非常简单，进入服务器终端，执行`curl -O https://www.huasenjio.top/huasen-store/open-sh/install.sh ; chmod +x install.sh ; bash ./install.sh`命令，下载安装脚本并且执行。如果运行失败，重新运行即可。如有疑问，请务必查阅 `huasenjio-compose/bin/readme.md` 文档。
 
 ### 方式 2：宝塔部署
 
