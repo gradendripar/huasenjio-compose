@@ -94,8 +94,14 @@ export default {
     return {
       // 连接对象
       ws: null,
+      // 重连次数
+      wsReconnectAttempts: 0,
+      // 最大重连次数
+      wsMaxReconnectAttempts: 3,
       // 定时轮询对象
       timer: null,
+      // 是否有请求正在等待响应（防止请求堆积）
+      wsPending: false,
       // 系统状态信息
       systemStatus: {
         time: ['00:00:01', '00:00:02'],
@@ -210,17 +216,39 @@ export default {
 
     // 初始化ws
     initWebsocket() {
+      this.wsReconnectAttempts = 0;
+      this.wsMaxReconnectAttempts = 3;
+      this.connectWebsocket();
+    },
+
+    connectWebsocket() {
+      if (this.ws && this.ws.readyState === 1) return;
       this.ws = new WebSocket(`${this.CONSTANT.baseWebsocketURL}?token=${this.manage.token}`);
       this.ws.onopen = e => {
         console.log('websocket已连接...');
+        this.wsReconnectAttempts = 0;
         this.initPoll();
       };
       this.ws.onmessage = info => {
         this.handleWebSocketMessage(info.data);
       };
+      this.ws.onclose = e => {
+        console.log('websocket已断开：', e.code, e.reason);
+        if (e.code !== 1000 && this.wsReconnectAttempts < this.wsMaxReconnectAttempts) {
+          this.wsReconnectAttempts++;
+          console.log(`websocket尝试重连 (${this.wsReconnectAttempts}/${this.wsMaxReconnectAttempts})...`);
+          setTimeout(() => {
+            this.connectWebsocket();
+          }, 3000 * this.wsReconnectAttempts);
+        }
+      };
+      this.ws.onerror = err => {
+        console.error('websocket异常：', err);
+      };
     },
 
     handleWebSocketMessage(data) {
+      this.wsPending = false;
       try {
         data = JSON.parse(data);
         this.handleSystemStatus(data.system);
@@ -354,7 +382,8 @@ export default {
     initPoll() {
       this.timer = tool.timeout2Interval(
         () => {
-          if (this.ws && this.ws.readyState === 1) {
+          if (this.ws && this.ws.readyState === 1 && !this.wsPending) {
+            this.wsPending = true;
             this.ws.send(JSON.stringify(['system', 'visitor']));
           }
         },
@@ -365,7 +394,10 @@ export default {
   },
 
   destroyed() {
-    if (this.ws) this.ws.close();
+    if (this.ws) {
+      this.wsReconnectAttempts = this.wsMaxReconnectAttempts;
+      this.ws.close(1000, 'component destroyed');
+    }
     if (this.timer) this.timer.clear();
   },
 };

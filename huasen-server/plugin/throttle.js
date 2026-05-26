@@ -7,7 +7,7 @@
  */
 
 const EventProxy = require('eventproxy');
-const { epWorking } = require('../service/index.js');
+const { working, epWorking } = require('../service/index.js');
 const { tool } = require('huasen-lib');
 
 class Throttle {
@@ -54,14 +54,9 @@ class Throttle {
       unit.options.handleRequestHook();
     }
     let ep = EventProxy();
-    ep.bind('error', err => {
-      // 移除全部监听
-      ep.unbind();
-      // 调入全局的错误处理函数
-      unit.next(err);
-    });
     // 挂载事件分发器，任务执行器，单元信息到请求对象
     unit['ep'] = ep;
+    unit.req['working'] = unit.res['working'] = working;
     unit.req['epWorking'] = unit.res['epWorking'] = epWorking;
     unit.req['huasenUnit'] = unit.res['huasenUnit'] = ep['huasenUnit'] = unit;
     // 开始倒计时
@@ -87,7 +82,7 @@ class Throttle {
     clearTimeout(unitTimer);
     // 检查是否已响应
     if (!unit.res.writableEnded) {
-      global.huasen.responseData(unit.res, {}, 'ERROR', '已超时，稍后重试！');
+      global.huasen.responseData(unit.res, {}, 'ERROR', '已超时 60 秒，请您稍后重试！');
       return;
     }
     // 建议删除引用，避免内存泄漏
@@ -124,7 +119,7 @@ class Throttle {
 }
 
 // 实例化
-const throttle = new Throttle(20, 100, 20000);
+const throttle = new Throttle(20, 100, 1000 * 60 * 3);
 
 module.exports = {
   throttle,

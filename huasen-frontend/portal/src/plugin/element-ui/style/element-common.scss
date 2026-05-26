@@ -1,3 +1,8 @@
+.el-textarea__inner {
+  resize: none !important;
+  padding-right: 4px;
+}
+
 // 去除弹出层的箭头，例如：select
 .el-popper {
   .popper__arrow {

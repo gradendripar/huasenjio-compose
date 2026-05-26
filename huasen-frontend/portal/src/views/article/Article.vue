@@ -36,7 +36,7 @@
 </template>
 
 <script>
-import Empty from '@/components/content/empty/Empty.vue';
+import { HEmpty as Empty } from '@huasen/ui';
 export default {
   name: 'Article',
   components: { Empty },

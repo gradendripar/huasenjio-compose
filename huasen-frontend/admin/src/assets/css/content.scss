@@ -49,3 +49,18 @@ li {
     margin-right: 5px;
   }
 }
+
+// 自定义拖拽样式类
+.draggable-drag-ghost {
+  opacity: 0.7;
+  outline: 1px dashed var(--blue-400);
+  background: linear-gradient(135deg, var(--blue-100), var(--blue-200));
+}
+
+.draggable-drag-chosen {
+  background-color: var(--blue-100) !important;
+}
+
+.draggable-drag-moving {
+  opacity: 0.9;
+}

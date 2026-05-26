@@ -6,7 +6,7 @@
  * @Description: 登录面板
 -->
 <template>
-  <HsDialog title="" :fullscreen="true" :show-close="false" :close-on-press-escape="false" :visible="showSign">
+  <HDialog title="" :fullscreen="true" :show-close="false" :close-on-press-escape="false" :visible="showSign">
     <div class="sign shadow-md rounded-lg">
       <div class="banner">
         <img src="~@/assets/img/sign/default.svg" />
@@ -27,7 +27,15 @@
                   </el-input>
                 </el-form-item>
                 <el-form-item class="form__password" prop="password">
-                  <el-input type="password" v-model="submitForm.password" :show-password="true" autocomplete="off" placeholder="请输入密码" @keyup.enter.native="login"></el-input>
+                  <el-input type="password" v-model="submitForm.password" :show-password="true" autocomplete="off" placeholder="请输入密码"></el-input>
+                </el-form-item>
+                <el-form-item class="form__captcha" prop="captchaCode">
+                  <div class="captcha-group">
+                    <div class="captcha-input">
+                      <el-input v-model="submitForm.captchaCode" placeholder="请输入图片验证码" @keyup.enter.native="login"></el-input>
+                    </div>
+                    <div class="captcha-img" @click="refreshCaptcha" v-html="captchaSvg" title="点击刷新"></div>
+                  </div>
                 </el-form-item>
               </el-form>
               <div class="btn" @click="login">{{ isExistManege ? '登 录' : '添 加' }}</div>
@@ -36,17 +44,17 @@
         </div>
       </div>
     </div>
-  </HsDialog>
+  </HDialog>
 </template>
 <script>
 import { mapState, mapMutations } from 'vuex';
 import { Validator } from 'huasen-lib';
 const validator = new Validator();
 const getElementFormValidator = validator.getElementFormValidator.bind(validator);
-import HsDialog from '@/components/common/dialog/Dialog.vue';
+import { HDialog } from '@huasen/ui';
 export default {
   name: 'Sign',
-  components: { HsDialog },
+  components: { HDialog },
   data() {
     return {
       showSign: true,
@@ -58,12 +66,17 @@ export default {
         password: '',
         mail: '',
         mailServer: '@qq.com',
+        captchaCode: '',
       },
+      // 验证码
+      captchaSvg: '',
+      captchaToken: '',
 
       // 校验的规则
       rules: {
         id: [{ validator: getElementFormValidator(['isNonEmpty::必填项', 'minLength:5::长度小于5', 'maxLength:20::长度大于20', 'isEmail::请输入邮箱']) }],
         password: [{ validator: getElementFormValidator(['isNonEmpty::必填项', 'minLength:5::长度小于5', 'maxLength:20::长度大于20']) }],
+        captchaCode: [{ validator: getElementFormValidator(['isNonEmpty::必填项']) }],
       },
 
       // 邮箱选项
@@ -101,9 +114,19 @@ export default {
   },
   async created() {
     await this.existMange();
+    this.refreshCaptcha();
   },
   methods: {
     ...mapMutations(['commitAll']),
+
+    // 获取/刷新图片验证码
+    refreshCaptcha() {
+      this.API.user.getCaptcha({}, { notify: false }).then(res => {
+        this.captchaSvg = res.data.svg;
+        this.captchaToken = res.data.token;
+        this.submitForm.captchaCode = '';
+      });
+    },
 
     /**
      * 判断管理员是否存在
@@ -126,12 +149,26 @@ export default {
         if (valid) {
           if (this.isExistManege) {
             this.API.user
-              .login(this.submitForm, {
-                secret: 'rsa',
-              })
+              .login(
+                {
+                  id: this.submitForm.id,
+                  password: this.submitForm.password,
+                  captchaToken: this.captchaToken,
+                  captchaCode: this.submitForm.captchaCode,
+                },
+                {
+                  secret: 'rsa',
+                },
+              )
               .then(res => {
+                // 存储到统一，localStorage key
+                this.STORAGE.setItem(this.CONSTANT.TOKEN_KEY, res.data.token);
+                // 兼容旧逻辑
                 this.STORAGE.setItem(this.CONSTANT.localManage, res.data);
                 location.reload();
+              })
+              .catch(() => {
+                this.refreshCaptcha();
               });
           } else {
             this.$confirm('该操作将为系统初始化管理员，请务必确保输入信息的正确性，一旦初始化后将无法再次更改！', '添加系统管理员', {
@@ -144,6 +181,7 @@ export default {
                   secret: 'rsa',
                 });
                 this.isExistManege = true;
+                this.refreshCaptcha();
               })
               .catch(error => {});
           }
@@ -182,6 +220,31 @@ export default {
     .content {
       .panel {
         padding: 20px 10px;
+        .login {
+          .captcha-group {
+            width: 100%;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            .captcha-input {
+              width: calc(100% - 120px - 12px);
+            }
+            .captcha-img {
+              width: 120px;
+              height: 100%;
+              margin-left: 12px;
+              border-radius: 4px;
+              overflow: hidden;
+              cursor: pointer;
+              border: 1px solid var(--ui-theme-border);
+              svg {
+                width: 100%;
+                height: 40px;
+                border-radius: 4px;
+              }
+            }
+          }
+        }
       }
       .btn {
         border-radius: 28px;

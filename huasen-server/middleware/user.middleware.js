@@ -11,7 +11,7 @@ function checkUserAccountUnique(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'find',
         payloads: [
           {

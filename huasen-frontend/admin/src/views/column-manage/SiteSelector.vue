@@ -3,7 +3,7 @@
  * @Date: 2022-09-12 10:40:59
  * @LastEditors: huasenjio
  * @LastEditTime: 2023-05-28 13:25:28
- * @Description: 网站选择器
+ * @Description: 栏目关联网站
 -->
 
 <template>
@@ -15,14 +15,27 @@
             <div class="title">已选择</div>
           </div>
           <ul class="site-list">
-            <template v-if="selectSites.length">
-              <Draggable v-model="selectSites" filter=".no-drap" animation="400">
+            <template v-if="relativeSites.length">
+              <Draggable
+                v-model="relativeSites"
+                filter=".no-drap"
+                animation="400"
+                :group="{ name: 'sites' }"
+                :ghost-class="'draggable-drag-ghost'"
+                :chosen-class="'draggable-drag-chosen'"
+                :drag-class="'draggable-drag-moving'"
+                :fallback-tolerance="3"
+                @end="onDragEnd"
+              >
                 <transition-group>
-                  <li class="site-item drag-item" v-for="(item, index) in selectSites" :key="item._id">
+                  <li class="site-item drag-item" v-for="(item, index) in relativeSites" :key="`${item._id}-${index}`">
                     <i class="el-icon-rank pointer"></i>
                     <div class="name text no-drap">{{ item.name | emptyTip }}</div>
                     <div class="description text no-drap">{{ item.description | emptyTip }}</div>
-                    <i class="el-icon-delete pointer remove no-drap" @click="remove(item, index)"></i>
+
+                    <el-popconfirm title="确定删除吗？" @confirm="remove(item, index)">
+                      <i slot="reference" class="el-icon-delete pointer remove no-drap"></i>
+                    </el-popconfirm>
                   </li>
                 </transition-group>
               </Draggable>
@@ -35,7 +48,7 @@
             <div class="title">待选择</div>
             <div class="search">
               <el-select v-model="searchType">
-                <el-option :label="'标签名'" :value="'tag'"> </el-option>
+                <!-- <el-option :label="'标签名'" :value="'tag'"> </el-option> -->
                 <el-option :label="'网站名'" :value="'siteName'"> </el-option>
               </el-select>
               <el-input :placeholder="searchPlaceholderText" suffix-icon="el-icon-search" v-model="searchText"> </el-input>
@@ -54,10 +67,10 @@
           </ul>
         </div>
       </div>
-      <div class="site-selector-footer">
-        <el-button type="primary" plain @click="save">确定配置</el-button>
-        <el-button type="warning" plain @click="cancel">取消修改</el-button>
-      </div>
+      <!-- <div class="site-selector-footer">
+        <el-button type="primary" plain @click="save">完成配置</el-button>
+        <el-button type="warning" plain @click="cancel"></el-button>
+      </div> -->
     </div>
   </HsDrawer>
 </template>
@@ -80,38 +93,15 @@ export default {
     return {
       searchText: '',
       searchType: 'siteName', // tag || siteName
-      selectSites: [],
-      selectSiteIndex: [],
       sites: [],
-      // 初始化选中的链接id
-      preSelectSiteIndex: [],
+      relativeSites: [],
     };
   },
 
   computed: {
     displaySites() {
       if (this.searchType === 'tag') {
-        if (!this.searchText) {
-          // 没有搜索字符时，展示全部
-          return this.sites;
-        } else {
-          // 匹配tag，展示命中的站点
-          return this.sites.filter(item => {
-            if (item.expand && item.expand !== '{}') {
-              try {
-                let tags = JSON.parse(item.expand).tag;
-                return tags.some(tagName => {
-                  if (tagName.toUpperCase().includes(this.searchText.toUpperCase())) {
-                    item.targetTagName = tagName;
-                    return true;
-                  }
-                });
-              } catch {
-                console.log('标签筛选异常');
-              }
-            }
-          });
-        }
+        return [];
       } else {
         return this.sites.filter(item => item.name.toUpperCase().includes(this.searchText.toUpperCase()));
       }
@@ -125,23 +115,10 @@ export default {
   },
 
   watch: {
-    selectSiteIndex() {
-      this.handleSelectSite();
-    },
-
-    sites() {
-      this.handleSelectSite();
-    },
-
     currentColumn: {
       handler(nV, oV) {
-        try {
-          this.selectSiteIndex = Array.isArray(JSON.parse(nV.siteStore)) ? [...JSON.parse(nV.siteStore)] : [];
-          // 保存第一次初始化的选中链接
-          this.preSelectSiteIndex = [...this.selectSiteIndex];
-        } catch (err) {
-          this.selectSiteIndex = [];
-        }
+        // 查找当前栏目关联的网站
+        this.querySiteByColumn();
       },
       deep: true,
       immediate: true,
@@ -153,80 +130,82 @@ export default {
   },
 
   methods: {
+    onDragEnd() {
+      const relativeSiteIds = this.relativeSites.map(item => item._id);
+      this.API.column
+        .updateBindedSiteOrder(
+          {
+            columnId: this.currentColumn._id,
+            siteIds: relativeSiteIds,
+          },
+          {
+            notify: false,
+          },
+        )
+        .then(res => {
+          this.$message.success('排序成功');
+        })
+        .catch(err => {
+          this.$message.error('排序失败');
+        })
+        .finally(() => {
+          this.querySiteByColumn();
+        });
+    },
+
+    // 查询当前栏目关联的网站
+    querySiteByColumn() {
+      this.API.column
+        .findBindedSite(
+          {
+            columnId: this.currentColumn._id,
+          },
+          {
+            notify: false,
+          },
+        )
+        .then(res => {
+          const sites = res && res.data ? res.data.sites : undefined;
+          this.relativeSites = Array.isArray(sites) ? sites : [];
+        });
+    },
+
     querySite() {
       this.API.site.findSiteByList({}, { notify: false }).then(res => {
         this.sites = res.data;
       });
     },
 
-    handleSelectSite() {
-      let selectSiteTemp = [];
-      this.selectSiteIndex.forEach(_id => {
-        this.sites.some(site => {
-          if (site._id === _id) {
-            selectSiteTemp.push(site);
-            // 一真则真，中断查找
-            return true;
-          }
-        });
-      });
-      this.selectSites = selectSiteTemp;
-    },
-
     getSelectStatus(site) {
-      return this.selectSiteIndex.includes(site._id);
+      return this.relativeSites.some(item => item._id === site._id);
     },
 
     imgUrl(site) {
       return site.icon ? site.icon : require('@/assets/img/error/image-error.png');
     },
 
-    selectSite(site) {
-      let { _id } = site;
-      let existInex = this.selectSiteIndex.indexOf(_id);
-      if (existInex === -1) {
-        // 不存在
-        this.selectSiteIndex.push(_id);
-      } else {
-        // 存在
-        this.selectSiteIndex.splice(existInex, 1);
+    async selectSite(site) {
+      // 避免重复绑定
+      if (this.getSelectStatus(site)) {
+        return;
       }
+      this.API.column
+        .bindSite(
+          {
+            columnId: this.currentColumn._id,
+            siteIds: [site._id],
+          },
+          { notify: false },
+        )
+        .then(res => {
+          this.querySiteByColumn();
+        })
+        .catch(err => {
+          this.$message.error('操作失败');
+        });
     },
 
     async save() {
-      let needBindSite = [];
-      let needUnbindSite = [];
-      needUnbindSite = this.preSelectSiteIndex.filter(el => this.selectSiteIndex.indexOf(el) === -1);
-      needBindSite = this.selectSiteIndex.filter(el => this.preSelectSiteIndex.indexOf(el) === -1);
-      // 更改栏目
-      let siteStore = this.selectSites.map(item => item._id);
-      await this.API.column.updateColumn({
-        _id: this.currentColumn._id,
-        siteStore: JSON.stringify(siteStore),
-      });
-      // 选择性绑定/解绑
-      if (needBindSite.length) {
-        await this.API.site.bindColumnToSite(
-          {
-            columnId: this.currentColumn._id,
-            sites: needBindSite,
-          },
-          {
-            notify: false,
-          },
-        );
-      }
-      if (needUnbindSite.length) {
-        await this.API.site.unbindColumnToSite(
-          {
-            columnId: this.currentColumn._id,
-            sites: needUnbindSite,
-          },
-          {
-            notify: false,
-          },
-        );
-      }
       this.$emit('save');
     },
 
@@ -235,12 +214,18 @@ export default {
       this.$emit('update:visible', false);
     },
 
-    remove(site, index) {
-      let existInex = this.selectSiteIndex.indexOf(site._id);
-      if (existInex !== -1) {
-        // 不存在
-        this.selectSiteIndex.splice(existInex, 1);
-      }
+    async remove(site, index) {
+      this.API.column
+        .unbindSite({
+          columnId: this.currentColumn._id,
+          siteIds: [site._id],
+        })
+        .then(res => {
+          this.relativeSites.splice(index, 1);
+        })
+        .catch(err => {
+          this.$message.error('操作失败');
+        });
     },
   },
 };
@@ -252,7 +237,7 @@ export default {
   height: 100%;
   .site-selector-main {
     width: 100%;
-    height: calc(100% - 60px);
+    height: calc(100% - 0px);
     overflow-x: hidden;
     overflow-y: auto;
     .selected {
@@ -270,10 +255,13 @@ export default {
         margin-top: 10px;
         overflow-x: hidden;
         overflow-y: auto;
+        padding-left: 4px;
+        padding-right: 4px;
         .site-item {
           display: flex;
           align-items: center;
           margin-top: 8px;
+          padding: 2px;
           .name {
             max-width: 120px;
             margin-left: 10px;
@@ -408,6 +396,20 @@ export default {
   /*隐藏滚动条*/
   ::-webkit-scrollbar {
     display: none;
+  }
+  // 自定义拖拽样式类
+  .draggable-drag-ghost {
+    opacity: 0.7;
+    outline: 1px dashed var(--blue-400);
+    background: linear-gradient(135deg, var(--blue-100), var(--blue-200));
+  }
+
+  .draggable-drag-chosen {
+    background-color: var(--blue-100) !important;
+  }
+
+  .draggable-drag-moving {
+    opacity: 0.9;
   }
 }
 </style>

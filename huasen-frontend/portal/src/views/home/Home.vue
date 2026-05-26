@@ -41,7 +41,7 @@ import HomeSite from './site/HomeSite.vue';
 
 import SiteDetail from '@/views/home/site/SiteDetail.vue';
 
-import Empty from '@/components/content/empty/Empty.vue';
+import { HEmpty as Empty } from '@huasen/ui';
 
 export default {
   name: 'Home',

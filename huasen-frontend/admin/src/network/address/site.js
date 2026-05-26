@@ -15,8 +15,10 @@ const removeSite = post('/site/remove');
 const removeManySite = post('/site/removeMany');
 const updateSite = post('/site/update');
 const findSiteByList = post('/site/list');
+const importSite = post('/site/importSite');
 const findSiteTagByList = post('/site/siteTagList');
 const findSiteColmunByList = post('/site/siteColumnList');
+const findSitePinByList = post('/site/sitePinList');
 const bindColumnToSite = post('/site/bindColumn');
 const unbindColumnToSite = post('/site/unbindColumn');
 const findSiteFavicon = post('/site/findSiteFavicon');
@@ -29,8 +31,10 @@ export {
   removeManySite,
   updateSite,
   findSiteByList,
+  importSite,
   findSiteTagByList,
   findSiteColmunByList,
+  findSitePinByList,
   bindColumnToSite,
   unbindColumnToSite,
   findSiteFavicon,

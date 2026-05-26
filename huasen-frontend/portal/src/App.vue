@@ -14,7 +14,7 @@
 
 <script>
 import Wrap from '@/components/content/wrap/Wrap.vue';
-import BrowserTips from '@/components/content/browserTips/BrowserTips.vue';
+import { HBrowserTips as BrowserTips } from '@huasen/ui';
 import { tool } from 'huasen-lib';
 
 import { mapState, mapActions } from 'vuex';
@@ -64,6 +64,13 @@ export default {
         notify: false,
       },
     );
+    // 请求字典数据
+    try {
+      const dicRes = await this.API.App.getDictionary({}, { notify: false });
+      this.CONSTANT.dictionary = dicRes.data;
+    } catch (err) {
+      console.warn('获取字典数据失败', err);
+    }
     // 调整文档大小，避免网站在移动端网页中，无法适应屏幕的问题
     initScaleDocument();
   },

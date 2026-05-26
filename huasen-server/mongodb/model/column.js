@@ -30,37 +30,10 @@ let ColumnSchema = new mongoose.Schema(
     remarks: {
       type: String,
     },
-    // 收纳的链接
-    siteStore: {
-      type: String,
-      default: '[]',
-      validate: {
-        validator: function (desc) {
-          try {
-            let config = JSON.parse(desc);
-            if (Object.prototype.toString.call(config) === '[object Array]') return true;
-          } catch (err) {
-            return false;
-          }
-        },
-        message: '请输入JSON数组',
-      },
-    },
     // 拓展对象
     expand: {
       type: String,
       default: '{}',
-      validate: {
-        validator: function (desc) {
-          try {
-            let config = JSON.parse(desc);
-            if (Object.prototype.toString.call(config) === '[object Object]') return true;
-          } catch (err) {
-            return false;
-          }
-        },
-        message: '请输入JSON对象',
-      },
     },
     // 栏目是否可用
     enabled: {

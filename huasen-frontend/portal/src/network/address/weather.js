@@ -16,7 +16,7 @@ const getWeatherByCityCode = get(
     ziWaiXian: 'N/A',
     fengSu: '2级',
     fengXiang: '东南风',
-    shiDu: '86'
+    shiDu: '86',
   },
   false,
 );

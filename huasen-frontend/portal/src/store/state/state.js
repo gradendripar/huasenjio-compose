@@ -85,7 +85,7 @@ export default {
       openLabelClassification: false,
       autoIconPatch: false,
       notifyArticleId: null,
-      authorization: false,
+      hideCopyrightNotice: false,
     },
   },
 };

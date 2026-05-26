@@ -30,6 +30,7 @@ function initMongo() {
 initMongo();
 
 const db = mongoose.connection;
+
 db.on('error', err => {
   if (err.message.includes('ECONNREFUSED')) {
     console.log('[Huasen Log]：数据库未启动');

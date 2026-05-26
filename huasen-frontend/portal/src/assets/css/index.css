@@ -8,7 +8,7 @@
 @import url('./nprogress.css');
 @import url('./scrollbar.css');
 /* elementUI样式 */
-@import url('../../../node_modules/element-ui/lib/theme-chalk/index.css');
+@import "~element-ui/lib/theme-chalk/index.css";
 /* tailwind */
 @import url('./tailwind.css');
 /* 前端编译的图标 */

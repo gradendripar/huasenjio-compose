@@ -19,6 +19,7 @@ const {
   findByList,
   findSiteTagByList,
   findSiteColumnByList,
+  findSitePinByList,
   bindColumn,
   unbindColumn,
   importSite,
@@ -46,8 +47,31 @@ router.post('/remove', handleJWT(), checkManagePower, remove);
 router.post('/removeMany', handleJWT(), checkManagePower, removeMany);
 router.post('/update', handleJWT(), checkManagePower, update);
 router.post('/list', handleJWT(), checkManagePower, findByList);
+
+/**
+ * @api {post} /site/siteTagList 通过siteId查询绑定的标签
+ * @apiVersion 1.0.0
+ * @apiGroup Site
+ * @apiParam {string} siteId 网站ID
+ */
 router.post('/siteTagList', handleJWT(), checkManagePower, findSiteTagByList);
+
+/**
+ * @api {post} /site/siteColumnList 通过siteId查询绑定的栏目
+ * @apiVersion 1.0.0
+ * @apiGroup Site
+ * @apiParam {string} siteId 网站ID
+ */
 router.post('/siteColumnList', handleJWT(), checkManagePower, findSiteColumnByList);
+
+/**
+ * @api {post} /site/sitePinList 通过siteId查询绑定的标记
+ * @apiVersion 1.0.0
+ * @apiGroup Site
+ * @apiParam {string} siteId 网站ID
+ */
+router.post('/sitePinList', handleJWT(), checkManagePower, findSitePinByList);
+
 router.post('/bindColumn', handleJWT(), checkManagePower, bindColumn);
 router.post('/unbindColumn', handleJWT(), checkManagePower, unbindColumn);
 

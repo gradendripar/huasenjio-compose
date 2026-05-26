@@ -15,7 +15,7 @@ const { handleRecord } = require('../utils/record-handle.js');
 const { rsaDecryptLong } = require('huasen-lib');
 const { decrypt } = require('huasen-lib');
 const JWT = require('../plugin/jwt.js');
-const { getClientIP } = require('../utils/tool.js')
+const { getClientIP } = require('../utils/tool.js');
 
 // 导入流量控制模块
 const { throttle } = require('../plugin/throttle.js');
@@ -40,7 +40,7 @@ const handleBlackList = function (req, res, next) {
         return !!ip.includes(item);
       });
       if (exist) {
-        global.huasen.responseData(res, {}, 'ERROR', '你在拉黑单中，已禁止访问，劝你善良！');
+        global.huasen.responseData(res, {}, 'ERROR', '你在拉黑单中，已禁止访问！');
       } else {
         next();
       }
@@ -61,8 +61,9 @@ function handleRequestParams(req, res, next) {
   // 私钥解密对称密钥
   let aesSecret;
   if (secretKey) {
-    const aseRaw = rsaDecryptLong('private', SECRET_RSA_PRIVATE, secretKey, 117);
-    aesSecret = JSON.parse(aseRaw)
+    const aseRaw = rsaDecryptLong('private', SECRET_RSA_PRIVATE, secretKey);
+    // 通过headers传递aes密钥是json字符串，需要解析为数组
+    aesSecret = JSON.parse(aseRaw);
   }
   // 仅支持POST请求加密传输
   if (req.method === 'POST' && secretMethod && secretText) {
@@ -70,10 +71,10 @@ function handleRequestParams(req, res, next) {
       let raw;
       if (secretMethod === 'rsa') {
         // 非对称解密
-        raw = rsaDecryptLong('private', SECRET_RSA_PRIVATE, secretText, 117);
+        raw = rsaDecryptLong('private', SECRET_RSA_PRIVATE, secretText);
       } else if (secretMethod === 'aesinrsa' && aesSecret) {
         // 私钥解析aes密钥，然后使用aes解密数据
-        raw = decrypt(secretText, aesSecret)
+        raw = decrypt(secretText, aesSecret);
       }
       body = JSON.parse(raw);
     } catch (err) {
@@ -90,7 +91,7 @@ function handleRequestParams(req, res, next) {
 /**
  * 预处理请求携带的凭证信息
  * @param {boolean} intercept - 是否拦截请求
- * @returns 
+ * @returns
  */
 function handleJWT(intercept = true) {
   return function authentication(req, res, next) {
@@ -122,16 +123,16 @@ function handleJWT(intercept = true) {
           next();
         }
       });
-  }
+  };
 }
 
 /**
- * 移除异常参数，不支持key为null、undefined、""、"null"、"undefined"的参数，建议只在写入逻辑中使用
+ * 移除异常参数，不支持key为null、undefined、"null"、"undefined"的参数，建议只在写入逻辑中使用
  */
 function handleUselessParams(req, res, next) {
   Object.keys(req.huasenParams).forEach(key => {
     let value = req.huasenParams[key];
-    if (value === '' || value === null || value === undefined || value === 'null' || value === 'undefined') {
+    if (value === null || value === undefined || value === 'null' || value === 'undefined') {
       delete req.huasenParams[key];
     }
   });
@@ -165,7 +166,23 @@ function handleRequest(req, res, next) {
     waitTime: 0,
     responseTime: 0,
   };
-  let addThrottleTime = 0, handleTime = 0, deleteTime = 0;
+  let addThrottleTime = 0;
+  let handleTime = 0;
+  let deleteTime = 0;
+  let recorded = false;
+  const recordRequest = () => {
+    if (recorded) return;
+    recorded = true;
+    deleteTime = new Date().getTime();
+    // 获取请求参数
+    origin.payload = _.get(req, 'huasenParams') || {};
+    // 计算等待时间和响应时间
+    origin.waitTime = handleTime - addThrottleTime;
+    origin.responseTime = deleteTime - handleTime;
+    // 用户记录存入缓存
+    handleRecord(origin);
+  };
+  res.once('finish', recordRequest);
   // 添加请求至并发处理模块
   throttle.addRequest(req, res, next, {
     // 添加请求前
@@ -177,16 +194,7 @@ function handleRequest(req, res, next) {
       handleTime = new Date().getTime();
     },
     // 请求销毁后
-    deleteRequestHook: () => {
-      deleteTime = new Date().getTime();
-      // 获取请求参数
-      origin.payload = _.get(req, 'huasenParams') || {};
-      // 计算等待时间和响应时间
-      origin.waitTime = handleTime - addThrottleTime;
-      origin.responseTime = deleteTime - handleTime;
-      // 用户记录存入缓存
-      handleRecord(origin);
-    },
+    deleteRequestHook: recordRequest,
   });
 }
 
@@ -206,7 +214,6 @@ const handleDetectCrawler = function (req, res, next) {
     if (test) {
       console.warn(`检测爬虫：${test} ${ua} ${match}`);
     }
-
   });
   next();
 };
@@ -219,5 +226,5 @@ module.exports = {
   handleRequestError,
   handleRequest,
   handleJWT,
-  handleDetectCrawler
+  handleDetectCrawler,
 };

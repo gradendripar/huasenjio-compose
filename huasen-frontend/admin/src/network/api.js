@@ -22,6 +22,9 @@ import * as journal from './address/journal.js';
 import * as column from './address/column.js';
 import * as app from './address/app.js';
 import * as statistics from './address/statistics.js';
+import * as tag from './address/tag.js';
+import * as pin from './address/pin.js';
+import * as ai from './address/ai.js';
 
 // mock功能
 const mock = get('/mock/test', {
@@ -60,5 +63,8 @@ export default {
   journal,
   column,
   app,
-  statistics
+  statistics,
+  tag,
+  pin,
+  ai,
 };

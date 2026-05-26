@@ -1,5 +1,5 @@
 <template>
-  <HsDialog
+  <HDialog
     class="site__detail-dialog"
     :title="`${site.name}详情页`"
     :close-on-click-modal="false"
@@ -30,12 +30,12 @@
         <!-- <Empty v-else style="width: 100%; height: 100%" description="暂无内容"></Empty> -->
       </div>
     </div>
-  </HsDialog>
+  </HDialog>
 </template>
 <script>
 import { mapState } from 'vuex';
 import { tool, dayjs } from 'huasen-lib';
-import HsDialog from '@/components/content/dialog/Dialog.vue';
+import { HDialog } from '@huasen/ui';
 import Markdown from '@/components/common/markdown/Markdown.vue';
 // import Empty from '@/components/content/empty/Empty.vue';
 import ResizeHook from '@/mixins/resize-hook.js';
@@ -43,7 +43,7 @@ export default {
   name: 'SiteDetail',
   mixins: [ResizeHook],
   components: {
-    HsDialog,
+    HDialog,
     Markdown,
     // Empty,
   },

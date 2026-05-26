@@ -3,7 +3,7 @@
  * @Date: 2022-09-12 10:40:59
  * @LastEditors: huasenjio
  * @LastEditTime: 2023-05-06 23:08:29
- * @Description: 网站选择器
+ * @Description: 订阅关联栏目
 -->
 <template>
   <HsDrawer v-bind="$attrs" v-on="$listeners">
@@ -14,14 +14,26 @@
             <div class="title">已选择</div>
           </div>
           <ul class="column-list">
-            <template v-if="selectColumns.length">
-              <Draggable v-model="selectColumns" filter=".no-drap" animation="400">
+            <template v-if="relativeColumns.length">
+              <Draggable
+                v-model="relativeColumns"
+                animation="400"
+                filter=".no-drap"
+                :group="{ name: 'columns' }"
+                :ghost-class="'draggable-drag-ghost'"
+                :chosen-class="'draggable-drag-chosen'"
+                :drag-class="'draggable-drag-moving'"
+                :fallback-tolerance="3"
+                @end="onDragEnd"
+              >
                 <transition-group>
-                  <li class="column-item drag-item" v-for="(item, index) in selectColumns" :key="item._id">
+                  <li class="column-item drag-item" v-for="(item, index) in relativeColumns" :key="item._id">
                     <i class="el-icon-rank pointer"></i>
                     <div class="name text no-drap">{{ item.name | emptyTip }}</div>
                     <div class="description text no-drap">{{ item.description | emptyTip }}</div>
-                    <i class="el-icon-delete pointer remove no-drap" @click="remove(item, index)"></i>
+                    <el-popconfirm title="确定删除吗？" @confirm="remove(item, index)">
+                      <i slot="reference" class="el-icon-delete pointer remove no-drap"></i>
+                    </el-popconfirm>
                   </li>
                 </transition-group>
               </Draggable>
@@ -35,17 +47,17 @@
             <el-input placeholder="请输入栏目名称" suffix-icon="el-icon-search" v-model="searchText"> </el-input>
           </div>
           <ul class="column-group">
-            <li class="column" v-for="column in displayColumns" :key="column._id" @click="selectSite(column)">
+            <li class="column" v-for="column in displayColumns" :key="column._id" @click="selectColumn(column)">
               <div :title="column.name" class="name text">{{ column.name | emptyTip }}</div>
               <i v-if="getSelectStatus(column)" class="el-icon-success"></i>
             </li>
           </ul>
         </div>
       </div>
-      <div class="column-selector-footer">
+      <!-- <div class="column-selector-footer">
         <el-button type="primary" plain @click="save">确定配置</el-button>
         <el-button type="warning" plain @click="cancel">取消修改</el-button>
-      </div>
+      </div> -->
     </div>
   </HsDrawer>
 </template>
@@ -68,10 +80,8 @@ export default {
   data() {
     return {
       searchText: '',
-      selectColumns: [],
-      selectColumnIndex: [],
       columns: [],
-      activeCollapseName: '',
+      relativeColumns: [],
     };
   },
 
@@ -82,21 +92,9 @@ export default {
   },
 
   watch: {
-    selectColumnIndex() {
-      this.handleSelectSite();
-    },
-
-    columns() {
-      this.handleSelectSite();
-    },
-
     currentJournal: {
       handler(nV, oV) {
-        try {
-          this.selectColumnIndex = Array.isArray(JSON.parse(nV.columnStore)) ? [...JSON.parse(nV.columnStore)] : [];
-        } catch (err) {
-          this.selectColumnIndex = [];
-        }
+        this.queryColumnByJournal();
       },
       deep: true,
       immediate: true,
@@ -108,56 +106,79 @@ export default {
   },
 
   methods: {
+    onDragEnd() {
+      const relativeColumnIds = this.relativeColumns.map(item => item._id);
+      this.API.journal
+        .updateBindedColumnOrder(
+          {
+            journalId: this.currentJournal._id,
+            columnIds: relativeColumnIds,
+          },
+          {
+            notify: false,
+          },
+        )
+        .then(res => {
+          this.$message.success('排序成功');
+        })
+        .catch(err => {
+          this.$message.error('排序失败');
+        })
+        .finally(() => {
+          this.queryColumnByJournal();
+        });
+    },
+
+    // 查询当前栏目关联的网站
+    queryColumnByJournal() {
+      this.API.journal
+        .findBindedColumn(
+          {
+            journalId: this.currentJournal._id,
+          },
+          {
+            notify: false,
+          },
+        )
+        .then(res => {
+          const columns = res && res.data ? res.data.columns : undefined;
+          this.relativeColumns = Array.isArray(columns) ? columns : [];
+        });
+    },
+
     queryColumn() {
       this.API.column.findColumnByList({}, { notify: false }).then(res => {
         this.columns = res.data;
       });
     },
 
-    handleSelectSite() {
-      let selectSiteTemp = [];
-      this.selectColumnIndex.forEach(_id => {
-        this.columns.some(column => {
-          if (column._id === _id) {
-            selectSiteTemp.push(column);
-            // 一真则真，中断查找
-            return true;
-          }
+    selectColumn(column) {
+      // 避免重复绑定
+      if (this.getSelectStatus(column)) {
+        return;
+      }
+      this.API.journal
+        .bindColumn(
+          {
+            journalId: this.currentJournal._id,
+            columnIds: [column._id],
+          },
+          { notify: false },
+        )
+        .then(res => {
+          this.queryColumnByJournal();
+        })
+        .catch(err => {
+          this.$message.error('操作失败');
         });
-      });
-      this.selectColumns = selectSiteTemp;
     },
 
     getSelectStatus(column) {
-      return this.selectColumnIndex.includes(column._id);
-    },
-
-    imgUrl(column) {
-      return column.icon ? column.icon : require('@/assets/img/loading/1.gif');
-    },
-
-    selectSite(column) {
-      let { _id } = column;
-      let existInex = this.selectColumnIndex.indexOf(_id);
-      if (existInex === -1) {
-        // 不存在
-        this.selectColumnIndex.push(_id);
-      } else {
-        // 存在
-        this.selectColumnIndex.splice(existInex, 1);
-      }
+      return this.relativeColumns.some(item => item._id === column._id);
     },
 
     save() {
-      let columnStore = this.selectColumns.map(item => item._id);
-      this.API.journal
-        .updateJournal({
-          _id: this.currentJournal._id,
-          columnStore: JSON.stringify(columnStore),
-        })
-        .then(res => {
-          this.$emit('save');
-        });
+      this.$emit('save');
     },
 
     cancel() {
@@ -165,12 +186,18 @@ export default {
       this.$emit('update:visible', false);
     },
 
-    remove(column, index) {
-      let existInex = this.selectColumnIndex.indexOf(column._id);
-      if (existInex !== -1) {
-        // 不存在
-        this.selectColumnIndex.splice(existInex, 1);
-      }
+    remove(journal, index) {
+      this.API.journal
+        .unbindColumn({
+          journalId: this.currentJournal._id,
+          columnIds: [journal._id],
+        })
+        .then(res => {
+          this.relativeColumns.splice(index, 1);
+        })
+        .catch(err => {
+          this.$message.error('操作失败');
+        });
     },
   },
 };
@@ -182,7 +209,7 @@ export default {
   height: 100%;
   .column-selector-main {
     width: 100%;
-    height: calc(100% - 60px);
+    height: calc(100%);
     overflow-x: hidden;
     overflow-y: auto;
     .selected {
@@ -195,10 +222,12 @@ export default {
       overflow-x: hidden;
       overflow-y: auto;
       .column-list {
+        padding: 0 4px;
         .column-item {
           display: flex;
           align-items: center;
           margin-top: 8px;
+          padding: 2px;
           .name {
             max-width: 120px;
             margin-left: 10px;

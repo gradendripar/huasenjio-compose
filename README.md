@@ -224,7 +224,16 @@
 
 #### 🏁 流程
 
-**脚本仅适用 CentOS 7/8、OpenCloudOS 9.x、Debian 12、Ubuntu 22 系统**，部署安装非常简单，进入服务器终端，执行`curl -O https://www.huasenjio.top/huasen-store/open-sh/install.sh ; chmod +x install.sh ; ./install.sh`命令，下载安装脚本并且执行。如果运行失败，重新运行即可。如有疑问，请务必查阅 `huasenjio-compose/bin/readme.md` 文档。
+**脚本仅适用 CentOS 7/8、OpenCloudOS 9.x、Debian 12、Ubuntu 22 系统**，部署安装非常简单，进入服务器终端，执行命令：
+
+```sh
+curl -O https://www.huasenjio.top/huasen-store/open-sh/install.sh && \
+curl -O https://www.huasenjio.top/huasen-store/open-sh/env-lib.sh && \
+chmod +x install.sh && \
+./install.sh
+```
+
+下载安装脚本并且执行。如果运行失败，重新运行即可。如有疑问，请务必查阅 `huasenjio-compose/bin/readme.md` 文档。
 
 ### 方式 2：宝塔部署
 
@@ -596,7 +605,7 @@ nginx:
 
 ### 本地启动调试
 
-#### 一.官网
+#### 一.起始页
 
 > ⚠️ 进入/huasenjio-compose/huasen-frontend/portal 目录下执行命令
 
@@ -618,7 +627,7 @@ npm run serve
 npm run build
 ```
 
-#### 二.后台管理
+#### 二.后台管理系统
 
 > ⚠️ 进入/huasenjio-compose/huasen-frontend/admin 目录下执行命令
 

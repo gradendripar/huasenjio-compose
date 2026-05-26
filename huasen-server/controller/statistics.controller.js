@@ -12,16 +12,28 @@ const checkDiskSpace = require('check-disk-space').default;
 const { POOL_ACCESS } = require('../config.js');
 const { readDirectory, bytesToSize, handleRate } = require('../utils/tool.js');
 const { getObjectRedisItem } = require('../plugin/ioredis/map.js');
+const { getAccessRecordCount } = require('../utils/access-memory-store.js');
+
+const VISITOR_REDIS_TIMEOUT = 1500;
+
+const withTimeout = (promise, timeout, fallback) => {
+  return Promise.race([
+    promise,
+    new Promise(resolve => {
+      setTimeout(() => resolve(fallback), timeout);
+    }),
+  ]);
+};
 
 function overview(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'find',
       },
       {
-        schemaName: 'Article',
+        schemaName: 'article',
         methodName: 'count',
         self: true,
       },
@@ -80,7 +92,7 @@ function uvInfo(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Record',
+        schemaName: 'record',
         methodName: 'limit',
         payloads: [{ time: -1 }, 5, {}, { __v: 0 }],
         self: true,
@@ -102,20 +114,25 @@ function uvInfo(req, res, next) {
 }
 
 function visitorInfo(req, res, next) {
-  getObjectRedisItem(POOL_ACCESS)
+  const sendVisitorInfo = visitorCount => {
+    global.huasen.responseData(
+      res,
+      {
+        visitorCount,
+        visitorRate: handleRate(visitorCount, global.huasenStatus.visitorCount),
+      },
+      'SUCCESS',
+      '查询访客数据',
+    );
+  };
+
+  withTimeout(getObjectRedisItem(POOL_ACCESS), VISITOR_REDIS_TIMEOUT, {})
     .then(async pool => {
-      global.huasen.responseData(
-        res,
-        {
-          visitorCount: Object.values(pool).length,
-          visitorRate: handleRate(Object.values(pool).length, global.huasenStatus.visitorCount),
-        },
-        'SUCCESS',
-        '查询访客数据',
-      );
+      const visitorCount = Math.max(Object.values(pool || {}).length, getAccessRecordCount());
+      sendVisitorInfo(visitorCount);
     })
     .catch(err => {
-      next(err);
+      sendVisitorInfo(getAccessRecordCount());
     });
 }
 

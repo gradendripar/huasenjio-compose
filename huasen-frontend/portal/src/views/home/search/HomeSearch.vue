@@ -67,7 +67,7 @@
 <script>
 import IconBox from '@/components/common/iconBox/IconBox.vue';
 import { AF, tool } from 'huasen-lib';
-import { jsonp } from '@/network/http.js';
+import { jsonp } from '@/network/request.js';
 import { mapState } from 'vuex';
 
 import Bus from '@/plugin/event-bus.js';
@@ -329,7 +329,6 @@ export default {
   left: 50%;
   transform: translateX(-50%);
   background-color: var(--gray-o7);
-  border: 1px solid var(--gray-300);
   z-index: 1;
   form {
     position: relative;
@@ -361,12 +360,11 @@ export default {
           align-items: center;
           .focus-icon {
             width: 14px;
-            height: 18px;
             margin: 0 4px;
             border-radius: 2px;
             border: 1px solid var(--gray-500);
             text-align: center;
-            line-height: 18px;
+            line-height: 20px;
           }
         }
       }

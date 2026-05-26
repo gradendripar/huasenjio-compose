@@ -4,13 +4,15 @@
 set -e
 # 部署路径
 project_path=$(cd "$(dirname "$0")" && pwd)
+# 引入环境配置函数库
+source "$project_path/env-lib.sh"
+
 # git 仓库
 git_path="https://gitee.com/HuaSenJioJio/huasenjio-compose.git"
-# git 仓库名称
 git_name="huasenjio-compose"
-# docker 镜像文件
+
+# docker 镜像文件及镜像源
 daemon_file="/etc/docker/daemon.json"
-# docker 镜像源
 mirror1="https://docker.m.daocloud.io"
 mirror2="https://dockerproxy.com"
 mirror3="https://registry.docker-cn.com"
@@ -173,17 +175,123 @@ install_docker_compose() {
     docker-compose --version
 }
 
-ask_nginx_port() {
-    echo "[Huasen Log]：花森起始页网关默认端口为 80，如需修改为其他端口？建议输入 1024-65535，例如：8282，并且避免与其他服务冲突。若直接回车，则保持不变。"
-    read -p "[Huasen Log]：请输入端口号：" nginx_port
+configure_environment() {
+    log_title "配置环境变量"
 
-    if [ -n "$nginx_port" ]; then
-        echo "[Huasen Log]：正在修改 nginx 端口为 $nginx_port:80 ..."
-        sed -i "s/- [0-9]*:80/- $nginx_port:80/" "$project_path/$git_name/docker-compose.yml"
-        echo "[Huasen Log]：nginx 端口已修改为 $nginx_port:80"
+    # 切换到项目根目录
+    cd "$project_path/$git_name"
+
+    # 初始化 .env 文件（如果不存在）
+    init_env_file "$project_path/$git_name/.env"
+
+    # 加载默认值
+    load_env "$project_path/$git_name/.env"
+
+    # 显示当前配置
+    show_env_summary
+
+    log_separator
+    log_info "接下来将配置各项环境变量，直接回车使用默认值，30秒无输入将自动使用默认值"
+    log_separator
+
+    # 1. 配置 Nginx 端口
+    log_info "花森起始页网关（nginx 服务）默认端口为 $NGINX_PORT"
+    log_info "建议输入 1024-65535 范围内的端口，例如：8082，请确保端口未被占用，避免与其他服务冲突"
+
+    local new_port=""
+    if prompt_with_timeout "是否需要修改 Nginx 端口？" "new_port" "$NGINX_PORT" 30; then
+        NGINX_PORT="$new_port"
+        save_env "NGINX_PORT" "$NGINX_PORT" "$project_path/$git_name/.env"
+        log_success "Nginx 端口已设置为: $NGINX_PORT"
     else
-        echo "[Huasen Log]：未修改 nginx 端口，保持默认端口 80"
+        log_info "保持默认端口: $NGINX_PORT"
     fi
+
+    log_separator
+
+    # 2. 配置 Redis 密码
+    log_info "Redis 服务默认密码为 $REDIS_PASSWORD，建议使用包含大小写字母、数字、特殊字符的强密码"
+
+    local new_redis_pwd=""
+    if prompt_with_timeout "是否需要修改 Redis 密码？" "new_redis_pwd" "$REDIS_PASSWORD" 30; then
+        REDIS_PASSWORD="$new_redis_pwd"
+        save_env "REDIS_PASSWORD" "$REDIS_PASSWORD" "$project_path/$git_name/.env"
+        log_success "Redis 密码已设置"
+    else
+        log_info "保持默认密码"
+    fi
+
+    log_separator
+
+    # 3. 配置 MongoDB Root 密码
+    log_info "MongoDB Root 管理员密码默认为 ${MONGO_ROOT_PASSWORD:0:5}***，建议使用包含大小写字母、数字、特殊字符的强密码"
+
+    local new_mongo_root_pwd=""
+    if prompt_with_timeout "是否需要修改 MongoDB Root 密码？" "new_mongo_root_pwd" "$MONGO_ROOT_PASSWORD" 30; then
+        MONGO_ROOT_PASSWORD="$new_mongo_root_pwd"
+        save_env "MONGO_ROOT_PASSWORD" "$MONGO_ROOT_PASSWORD" "$project_path/$git_name/.env"
+        log_success "MongoDB Root 密码已设置"
+    else
+        log_info "保持默认密码"
+    fi
+
+    log_separator
+
+    # 4. 配置 MongoDB 数据库用户名
+    log_info "MongoDB 数据库用户名默认为 $MONGO_APP_USERNAME，此账号用于后端服务连接数据库"
+
+    local new_mongo_app_user=""
+    if prompt_with_timeout "是否需要修改 MongoDB 数据库用户名？" "new_mongo_app_user" "$MONGO_APP_USERNAME" 30; then    
+        MONGO_APP_USERNAME="$new_mongo_app_user"
+        save_env "MONGO_APP_USERNAME" "$MONGO_APP_USERNAME" "$project_path/$git_name/.env"
+        log_success "MongoDB 数据库用户名已设置为: $MONGO_APP_USERNAME"
+    else
+        log_info "保持默认用户名: $MONGO_APP_USERNAME"
+    fi
+
+    log_separator
+
+    # 5. 配置 MongoDB 应用密码
+    log_info "MongoDB 应用密码默认为 ${MONGO_APP_PASSWORD:0:5}***，此密码用于后端服务连接数据库，建议使用包含大小写字母、数字、特殊字符的强密码"
+
+    local new_mongo_app_pwd=""
+    if prompt_with_timeout "是否需要修改 MongoDB 应用密码？" "new_mongo_app_pwd" "$MONGO_APP_PASSWORD" 30; then
+        MONGO_APP_PASSWORD="$new_mongo_app_pwd"
+        save_env "MONGO_APP_PASSWORD" "$MONGO_APP_PASSWORD" "$project_path/$git_name/.env"
+        log_success "MongoDB 应用密码已设置"
+    else
+        log_info "保持默认密码"
+    fi
+
+    log_separator
+
+    # 6. 配置 AES 对称密钥
+    log_info "AES 对称密钥用于数据库加密存储，当前使用默认：密钥: ${AES_SECRET_KEY:0:4}***，向量: ${AES_SECRET_IV:0:4}***，建议自动生成随机密钥以提高安全性"
+
+    local generate_aes=""
+    if prompt_with_timeout "是否自动生成新的 AES 对称密钥？后续不可修改" "generate_aes" "y" 30; then
+        if [[ "$generate_aes" =~ ^[Yy]$ ]] || [ -z "$generate_aes" ]; then
+            log_info "正在生成随机 AES 密钥..."
+            AES_SECRET_KEY=$(generate_aes_key)
+            AES_SECRET_IV=$(generate_aes_key)
+            save_env "AES_SECRET_KEY" "$AES_SECRET_KEY" "$project_path/$git_name/.env"
+            save_env "AES_SECRET_IV" "$AES_SECRET_IV" "$project_path/$git_name/.env"
+            log_success "AES 密钥已自动生成并保存"
+        else
+            log_info "保持使用默认 AES 密钥"
+        fi
+    else
+        log_info "保持使用默认 AES 密钥"
+    fi
+
+    log_separator
+
+    # 显示最终配置摘要
+    log_title "配置完成"
+    show_env_summary
+
+    # 同步所有配置文件
+    sync_config_files "$project_path/$git_name"
 }
 
 # 拉取代码
@@ -198,9 +306,14 @@ pull_code() {
 # 启动容器
 start_containers() {
     echo '[Huasen Log]：正在启动容器...'
-    docker-compose down
-    docker-compose build server
-    docker-compose up -d
+
+    # 引入环境配置函数库
+    source "$sh_path/env-lib.sh"
+    DOCKER_COMPOSE=$(get_docker_compose_cmd)
+
+    $DOCKER_COMPOSE down
+    $DOCKER_COMPOSE build server
+    $DOCKER_COMPOSE up -d
     echo '[Huasen log]：启动容器成功...'
 }
 
@@ -219,7 +332,7 @@ main() {
     configure_docker
     install_docker_compose
     pull_code
-    ask_nginx_port
+    configure_environment
     start_containers
     setup_shortcut_scripts
 }

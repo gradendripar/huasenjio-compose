@@ -158,7 +158,7 @@ export default {
     collectCaches() {
       // 收集当前路由相关的缓存
       this.$route.matched.forEach(routeMatch => {
-        const componentName = routeMatch.components?.default?.name;
+        const componentName = routeMatch.components && routeMatch.components.default ? routeMatch.components.default.name : undefined;
         // 配置了meta.keepAlive的路由组件添加到缓存
         if (routeMatch.meta.keepAlive) {
           this.addCache(componentName);
@@ -182,7 +182,7 @@ export default {
       const meta = this.LODASH.get(routeMatch, 'meta');
       const keepAlive = this.LODASH.get(meta, 'keepAlive');
       const title = this.LODASH.get(meta, 'title');
-      const componentName = routeMatch.components?.default?.name;
+      const componentName = routeMatch.components && routeMatch.components.default ? routeMatch.components.default.name : undefined;
       const tab = this.tabs.find((tab, index) => {
         if (tab.path === path) {
           existIndex = index;

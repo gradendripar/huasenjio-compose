@@ -8,7 +8,19 @@
 
 const express = require('express');
 const router = express.Router();
-const { add, findByPage, remove, update, findByCode, findAll, findJournalInformationById } = require('../controller/journal.controller.js');
+const {
+  add,
+  findByPage,
+  remove,
+  update,
+  findByCode,
+  findAll,
+  findJournalInformationById,
+  findBindedColumn,
+  updateBindedColumnOrder,
+  unbindColumn,
+  bindColumn,
+} = require('../controller/journal.controller.js');
 const { handleJWT, handleUselessParams } = require('../middleware/common.middleware.js');
 const { checkManagePower } = require('../middleware/power.middleware.js');
 
@@ -17,6 +29,10 @@ router.post('/remove', handleJWT(), checkManagePower, remove);
 router.post('/update', handleJWT(), checkManagePower, update);
 router.post('/findByCode', handleJWT(), checkManagePower, findByCode);
 router.post('/findByPage', handleJWT(), checkManagePower, findByPage);
+router.post('/findBindedColumn', handleJWT(), checkManagePower, findBindedColumn);
+router.post('/updateBindedColumnOrder', handleJWT(), checkManagePower, updateBindedColumnOrder);
+router.post('/unbindColumn', handleJWT(), checkManagePower, unbindColumn);
+router.post('/bindColumn', handleJWT(), checkManagePower, bindColumn);
 
 // 用户调用
 router.post('/findAll', handleJWT(false), findAll);

@@ -6,16 +6,14 @@
  * @Description: 登录面板
 -->
 <template>
-  <HsDialog :title="'登录注册'" :fullscreen="true" :visible.sync="showWrapSign" @close="closeSignPanel" @closeDialog="closeSignPanel">
+  <HDialog :title="'登录注册'" :fullscreen="true" :visible.sync="showWrapSign" @close="closeSignPanel" @cancelDialog="closeSignPanel">
     <div class="sign shadow-md rounded-lg">
       <div class="banner">
         <img src="~@/assets/img/sign/default.svg" />
       </div>
       <div class="tab">
         <ul>
-          <li :class="{ active: activeIndex == 0 }" @click="handleSelectTab(0)">
-            登录
-          </li>
+          <li :class="{ active: activeIndex == 0 }" @click="handleSelectTab(0)">登录</li>
           <li :class="{ active: activeIndex == 1 }" @click="handleSelectTab(1)">
             {{ isGetBackPassword ? '重置密码' : '注 册' }}
           </li>
@@ -33,19 +31,18 @@
                   </el-input>
                 </el-form-item>
                 <el-form-item class="form__password" prop="password">
-                  <el-input
-                    type="password"
-                    v-model="submitForm.password"
-                    :show-password="true"
-                    autocomplete="off"
-                    placeholder="密码仅支持数字/字母/下划线"
-                    @keyup.enter.native="login"
-                  ></el-input>
+                  <el-input type="password" v-model="submitForm.password" :show-password="true" autocomplete="off" placeholder="密码仅支持数字/字母/下划线"></el-input>
+                </el-form-item>
+                <el-form-item class="form__captcha" prop="captchaCode">
+                  <div class="captcha-group">
+                    <div class="captcha-input">
+                      <el-input v-model="submitForm.captchaCode" placeholder="请输入图片验证码" @keyup.enter.native="login"></el-input>
+                    </div>
+                    <div class="captcha-img" @click="refreshCaptcha" v-html="captchaSvg" title="点击刷新"></div>
+                  </div>
                 </el-form-item>
               </el-form>
-              <div class="btn" @click="login">
-                登 录
-              </div>
+              <div class="btn" @click="login">登 录</div>
             </section>
           </span>
           <!-- 注册 -->
@@ -78,17 +75,15 @@
           </span>
           <!-- 忘记密码 -->
           <div class="relative -top-px-28 text-right mt-px-8 px-px-4 flex justify-between">
-            <el-tooltip effect="dark" content="暂无协议（最终解释权归网站所有）" placement="top">
-              <el-checkbox v-model="submitForm.agree" label="is">
-                同意用户协议
-              </el-checkbox>
+            <el-tooltip effect="dark" content="最终解释权归网站所有" placement="top">
+              <el-checkbox v-model="submitForm.agree" :label="true"> 同意用户协议 </el-checkbox>
             </el-tooltip>
             <span class="text-gray-400 pointer" @click="handleGetBack">忘记密码？</span>
           </div>
         </div>
       </div>
     </div>
-  </HsDialog>
+  </HDialog>
 </template>
 <script>
 import { mapState, mapMutations } from 'vuex';
@@ -96,10 +91,10 @@ import { Validator } from 'huasen-lib';
 const validator = new Validator();
 const getElementFormValidator = validator.getElementFormValidator.bind(validator);
 
-import HsDialog from '@/components/content/dialog/Dialog.vue';
+import { HDialog } from '@huasen/ui';
 export default {
   name: 'WrapSign',
-  components: { HsDialog },
+  components: { HDialog },
   data() {
     return {
       // 提交数据
@@ -109,14 +104,19 @@ export default {
         mailCode: '',
         mail: '',
         mailServer: '@qq.com',
-        agree: '',
+        agree: false,
+        captchaCode: '',
       },
+      // 验证码
+      captchaSvg: '',
+      captchaToken: '',
 
       // 校验的规则
       rules: {
         id: [{ validator: getElementFormValidator(['isNonEmpty::必填项', 'minLength:5::长度小于5', 'maxLength:50::长度大于50', 'isEmail::请输入邮箱']) }],
         password: [{ validator: getElementFormValidator(['isNonEmpty::必填项', 'minLength:5::长度小于5', 'maxLength:20::长度大于20']) }],
         mailCode: [{ validator: getElementFormValidator(['isNonEmpty::必填项', 'isInteger::请输入数字']) }],
+        captchaCode: [{ validator: getElementFormValidator(['isNonEmpty::必填项']) }],
       },
 
       // 状态变量
@@ -170,8 +170,22 @@ export default {
       },
     },
   },
+  watch: {
+    showWrapSign(val) {
+      if (val) this.refreshCaptcha();
+    },
+  },
   methods: {
     ...mapMutations(['commitAll']),
+
+    // 获取/刷新图片验证码
+    refreshCaptcha() {
+      this.API.User.getCaptcha({}, { notify: false }).then(res => {
+        this.captchaSvg = res.data.svg;
+        this.captchaToken = res.data.token;
+        this.submitForm.captchaCode = '';
+      });
+    },
 
     /**
      * 切换tab
@@ -260,15 +274,23 @@ export default {
               let params = {
                 id: this.submitForm.id,
                 password: this.submitForm.password,
+                captchaToken: this.captchaToken,
+                captchaCode: this.submitForm.captchaCode,
               };
               this.API.User.login(params, {
                 notify: true,
                 secret: 'aesinrsa',
-              }).then(res => {
-                // 用户数据本地持久化
-                this.STORAGE.setItem(this.CONSTANT.localUser, res.data);
-                location.reload();
-              });
+              })
+                .then(res => {
+                  // 存储到统一 localStorage key
+                  this.STORAGE.setItem(this.CONSTANT.TOKEN_KEY, res.data.token);
+                  // 用户数据本地持久化
+                  this.STORAGE.setItem(this.CONSTANT.localUser, res.data);
+                  location.reload();
+                })
+                .catch(() => {
+                  this.refreshCaptcha();
+                });
             })
             .catch(() => {});
         }
@@ -343,6 +365,31 @@ export default {
       .panel {
         padding: 20px 10px;
         box-sizing: border-box;
+        .login {
+          .captcha-group {
+            width: 100%;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            .captcha-input {
+              width: calc(100% - 120px - 12px);
+            }
+            .captcha-img {
+              width: 120px;
+              height: 100%;
+              margin-left: 12px;
+              border-radius: 4px;
+              overflow: hidden;
+              cursor: pointer;
+              border: 1px solid var(--ui-theme-border);
+              svg {
+                width: 100%;
+                height: 40px;
+                border-radius: 4px;
+              }
+            }
+          }
+        }
         .register {
           .mail-code-group {
             display: flex;

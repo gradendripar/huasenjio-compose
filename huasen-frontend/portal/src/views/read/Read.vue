@@ -33,7 +33,7 @@
         </div>
       </header>
       <div class="content">
-        <HMarkdown v-if="article.content" :value="article.content"></HMarkdown>
+        <HMarkdown v-if="article.content" :value="article.content" :html="true" theme="default"></HMarkdown>
         <el-empty v-else style="height: 100%" :image-size="140" description="暂无数据"></el-empty>
       </div>
     </main>

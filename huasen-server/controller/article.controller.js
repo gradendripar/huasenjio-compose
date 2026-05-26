@@ -5,12 +5,70 @@
  * @LastEditTime: 2023-03-12 10:53:33
  * @Description: 新闻接口控制器
  */
+const { working } = require('../service/index.js');
+
+function normalizeArticleTags(tag = '') {
+  if (!tag) return [];
+  return tag
+    .split(/[\/|\\]/)
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function stripArticleContent(content = '') {
+  return String(content)
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[#>*`~\-\[\]()]/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getArticleExcerpt(content = '', maxLength = 160) {
+  const text = stripArticleContent(content);
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
+async function getPublicArticleSEOById(_id, code = 0) {
+  const [err, article] = await working([
+    {
+      schemaName: 'article',
+      methodName: 'findOne',
+      payloads: [
+        {
+          _id,
+          code: { $lte: code },
+          isDraft: false,
+        },
+      ],
+    },
+  ]);
+  if (err || !article) {
+    return null;
+  }
+  return {
+    _id: article._id.toString(),
+    title: article.title,
+    content: article.content || '',
+    contentText: stripArticleContent(article.content || ''),
+    excerpt: getArticleExcerpt(article.content || ''),
+    cover: article.bannerImg || '',
+    tags: normalizeArticleTags(article.tag),
+    creatTime: article.creatTime,
+    updateTime: article.updateTime,
+  };
+}
 
 function add(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Article',
+        schemaName: 'article',
         methodName: 'insertMany',
         payloads: [req.huasenParams],
       },
@@ -21,7 +79,7 @@ function add(req, res, next) {
   );
 }
 
-function findByPage(req, res, next) {
+async function findByPage(req, res, next) {
   let { pageNo, pageSize, manageId, title, tag, isDraft, code } = req.huasenParams;
   let params = { title: { $regex: new RegExp(title, 'i') } };
   if (tag) {
@@ -36,35 +94,34 @@ function findByPage(req, res, next) {
   if (code !== '' && code !== undefined && code !== null) {
     params.code = code;
   }
-  req.epWorking(
-    [
-      {
-        schemaName: 'Article',
-        methodName: 'findByPage',
-        payloads: [
-          {
-            $and: [params],
-          },
-          pageNo,
-          pageSize,
-          {
-            content: 0,
-          },
-        ],
-        self: true,
-      },
-    ],
-    result => {
-      global.huasen.responseData(res, result, 'SUCCESS', '分页查询文章');
+  const [err, data] = await req.working([
+    {
+      schemaName: 'article',
+      methodName: 'findByPage',
+      payloads: [
+        {
+          $and: [params],
+        },
+        pageNo,
+        pageSize,
+        {
+          content: 0, // 不返回content字段
+        },
+      ],
+      self: true,
     },
-  );
+  ]);
+  if (err) {
+    return global.huasen.responseData(res, null, 'ERROR', '分页查询文章异常');
+  }
+  global.huasen.responseData(res, data, 'SUCCESS', '分页查询文章');
 }
 
-function findAllByList(req, res, next) {
+function findByList(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Article',
+        schemaName: 'article',
         methodName: 'find',
         payloads: [],
       },
@@ -81,7 +138,7 @@ function findById(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Article',
+        schemaName: 'article',
         methodName: 'find',
         payloads: [
           {
@@ -93,7 +150,7 @@ function findById(req, res, next) {
         ],
       },
       {
-        schemaName: 'Article',
+        schemaName: 'article',
         methodName: 'upPV',
         payloads: [_id],
         self: true,
@@ -110,7 +167,7 @@ function remove(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Article',
+        schemaName: 'article',
         methodName: 'deleteOne',
         payloads: [
           {
@@ -130,7 +187,7 @@ function update(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Article',
+        schemaName: 'article',
         methodName: 'updateOne',
         payloads: [{ _id }, { $set: req.huasenParams }, { runValidators: true }],
       },
@@ -150,7 +207,7 @@ function findByCode(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Article',
+        schemaName: 'article',
         methodName: 'find',
         payloads: [
           {
@@ -174,9 +231,13 @@ function findByCode(req, res, next) {
 module.exports = {
   add,
   findByPage,
-  findAllByList,
+  findByList,
   remove,
   findById,
   update,
   findByCode,
+  getPublicArticleSEOById,
+  normalizeArticleTags,
+  stripArticleContent,
+  getArticleExcerpt,
 };

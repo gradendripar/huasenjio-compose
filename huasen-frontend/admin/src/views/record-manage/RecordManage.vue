@@ -17,6 +17,7 @@
       :showEdit="false"
       :showCopy="true"
       :showSelection="true"
+      :showRemoveMany="true"
       :total="total"
       @remove="removeRecord"
       @removeMany="handleRemoveMany"
@@ -85,7 +86,7 @@ export default {
       const { _id } = row;
       this.API.record.copyRecord({ _id }).then(res => {
         tool.copyTextToClip(JSON.stringify(res.data), () => {
-          alert('已复制日志数据');
+          this.$message.success('拷贝成功');
         });
       });
     },

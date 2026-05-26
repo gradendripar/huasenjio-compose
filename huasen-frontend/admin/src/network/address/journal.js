@@ -14,4 +14,9 @@ const addJournal = post('/journal/add');
 const removeJournal = post('/journal/remove');
 const updateJournal = post('/journal/update');
 
-export { findJournalByPage, addJournal, removeJournal, updateJournal };
+const findBindedColumn = post('/journal/findBindedColumn');
+const updateBindedColumnOrder = post('/journal/updateBindedColumnOrder');
+const unbindColumn = post('/journal/unbindColumn');
+const bindColumn = post('/journal/bindColumn');
+
+export { findJournalByPage, addJournal, removeJournal, updateJournal, findBindedColumn, updateBindedColumnOrder, unbindColumn, bindColumn };

@@ -9,7 +9,7 @@
   <div class="table-list">
     <!-- 参数搜索 -->
     <header v-if="showHeader">
-      <el-form ref="searchForm" :inline="true" :model="formData">
+      <el-form ref="searchForm" :inline="true" :model="formData" @submit.native.prevent>
         <el-row :gutter="10">
           <el-col v-for="(formItem, index) in visiableFormMap" :key="index" :span="formItem.span || 5">
             <el-form-item v-if="typeof formItem.show === 'undefined' ? true : !!formItem.show" class="search-item" :prop="formItem.key">
@@ -24,9 +24,16 @@
                   clearable
                 ></el-input>
                 <!-- select -->
-                <el-select v-if="formItem.type == 'select'" v-model="formData[formItem.key]" :placeholder="handlePlaceHolder(formItem)" @change="search">
-                  <el-option label="全部" :value="undefined"></el-option>
-                  <el-option v-for="item in formItem.typeConfig.options" :key="item.value" :label="item.label" :value="item.value"></el-option>
+                <el-select
+                  v-if="formItem.type == 'select'"
+                  v-model="formData[formItem.key]"
+                  :placeholder="handlePlaceHolder(formItem)"
+                  :filterable="getFormItemTypeConfig(formItem, 'filterable')"
+                  :multiple="getFormItemTypeConfig(formItem, 'multiple')"
+                  clearable
+                  @change="search"
+                >
+                  <el-option v-for="item in getFormItemTypeConfig(formItem, 'options', [])" :key="item.value" :label="item.label" :value="item.value"></el-option>
                 </el-select>
                 <!-- switch -->
                 <el-switch
@@ -53,7 +60,7 @@
                 </el-date-picker>
               </div>
               <div v-if="index === visiableFormMap.length - 1" class="more">
-                <el-button size="mini" icon="iconfont icon-guolv" @click="showFilterDialog = true">筛选</el-button>
+                <el-button size="mini" icon="iconfont icon-guolv" @click="handleFilter">筛选</el-button>
               </div>
             </el-form-item>
           </el-col>
@@ -62,7 +69,7 @@
               <el-button size="mini" type="primary" icon="el-icon-search" @click="search">查询</el-button>
               <el-button size="mini" v-if="showAdd" type="success" icon="el-icon-plus" @click="add">添加</el-button>
               <el-button size="mini" v-if="showAddMany" type="info" @click="addMany">导入/出</el-button>
-              <el-popconfirm v-if="showRemoveMany" @confirm="removeMany" class="ml-px-10" popper-class="delete-popcomfirm" title="确定删除吗？">
+              <el-popconfirm v-if="showRemoveMany && hasSelection" @confirm="removeMany" class="ml-px-10" popper-class="delete-popcomfirm" title="确定删除吗？">
                 <el-button slot="reference" size="mini" type="danger">批量删除</el-button>
               </el-popconfirm>
             </el-form-item>
@@ -87,7 +94,7 @@
         <!-- 序号 -->
         <el-table-column type="index" width="50" label="序号"> </el-table-column>
         <!-- 数据列 -->
-        <el-table-column v-for="(col, index) in tableMap" :key="index" :label="col.label" :width="col.width" :show-overflow-tooltip="true">
+        <el-table-column v-for="(col, index) in tableMap" :key="index" :label="col.label" :width="col.width" :show-overflow-tooltip="col.key !== 'icon'">
           <template slot-scope="scope">
             <!-- 图标 -->
             <template v-if="col.key === 'icon'">
@@ -110,15 +117,25 @@
             <template v-else-if="col.key === 'enabled'">
               <el-switch v-model="scope.row[col.key]" size="mini" disabled></el-switch>
             </template>
+            <!-- 颜色 -->
+            <template v-else-if="col.key === 'color' || col.key === 'bgColor'">
+              <div class="color-cell">
+                <span class="color-preview" :style="{ backgroundColor: scope.row[col.key] || 'transparent' }"></span>
+                <span class="color-text">{{ scope.row[col.key] | emptyTip }}</span>
+              </div>
+            </template>
 
             <!-- 其它 -->
             <div v-else class="text">{{ scope.row[col.key] | emptyTip }}</div>
           </template>
         </el-table-column>
         <!-- 操作 -->
-        <el-table-column label="操作" :width="240">
+        <el-table-column label="操作" property="operation" :width="operationWidth">
           <template slot-scope="scope">
-            <el-button v-if="showDetail" size="mini" plain @click="detail(scope.$index, scope.row)">详情书</el-button>
+            <!-- 自定义操作按钮 -->
+            <slot name="operation" :scope="scope" :row="scope.row" :index="scope.$index"></slot>
+            <!-- 预置操作按钮 -->
+            <el-button v-if="showDetail" size="mini" plain @click="detail(scope.$index, scope.row)">详情页</el-button>
             <el-button v-if="showRelation" size="mini" type="info" plain @click="relation(scope.$index, scope.row)">关联</el-button>
             <el-button v-if="showCopy" size="mini" type="warning" plain @click="copy(scope.$index, scope.row)">复制</el-button>
             <el-button v-if="showEdit" size="mini" type="primary" plain @click="edit(scope.$index, scope.row)">编辑</el-button>
@@ -146,7 +163,7 @@
       </el-pagination>
     </footer>
     <!-- 过滤弹窗 -->
-    <HSDialog v-if="showFilterDialog" title="编辑过滤条件" width="480px" maxHeight="500px" :visible.sync="showFilterDialog">
+    <HDialog v-if="showFilterDialog" title="编辑过滤条件" width="480px" maxHeight="500px" :visible.sync="showFilterDialog">
       <el-table height="100%" :data="this.formMap" stripe>
         <el-table-column property="label" label="条件名称"></el-table-column>
         <el-table-column property="key" label="条件关键词"></el-table-column>
@@ -156,16 +173,16 @@
           </template>
         </el-table-column>
       </el-table>
-    </HSDialog>
+    </HDialog>
   </div>
 </template>
 
 <script>
 import { tool } from 'huasen-lib';
-import HSDialog from '@/components/common/dialog/Dialog.vue';
+import { HDialog } from '@huasen/ui';
 export default {
   components: {
-    HSDialog,
+    HDialog,
   },
   name: 'TableList',
 
@@ -234,9 +251,17 @@ export default {
       type: Boolean,
       default: false,
     },
+    showRemoveMany: {
+      type: Boolean,
+      default: false,
+    },
     showDetail: {
       type: Boolean,
       default: false,
+    },
+    operationWidth: {
+      type: Number,
+      default: 240,
     },
   },
 
@@ -259,8 +284,8 @@ export default {
         pageNo: 1,
         pageSize: 10,
       },
-      // 是否显示多选删除按钮
-      showRemoveMany: false,
+      // 是否有选中的行
+      hasSelection: false,
       showFilterDialog: false,
     };
   },
@@ -286,6 +311,19 @@ export default {
       deep: true,
       immediate: true,
     },
+    // 监听formData变化，触发更新formMap中对应项的value
+    formData: {
+      handler(nV) {
+        const data = nV || {};
+        Object.keys(data).forEach(key => {
+          const target = this.formMap.find(item => item.key === key);
+          if (target) {
+            this.$set(target, 'value', data[key]);
+          }
+        });
+      },
+      deep: true,
+    },
   },
 
   methods: {
@@ -308,12 +346,17 @@ export default {
       this.filterForm = selection;
     },
 
-    handleSelectionChange() {
-      this.showRemoveMany = this.$refs.table.selection.length === 0 ? false : true;
+    handleSelectionChange(selection) {
+      this.hasSelection = selection.length > 0;
     },
 
     handlePlaceHolder(formItem) {
       return `请输入${formItem.label}`;
+    },
+
+    getFormItemTypeConfig(formItem, key, defaultValue = undefined) {
+      const typeConfig = formItem && formItem.typeConfig ? formItem.typeConfig : {};
+      return typeof typeConfig[key] === 'undefined' ? defaultValue : typeConfig[key];
     },
 
     handlePageSizeChange(pageSize) {
@@ -380,9 +423,15 @@ export default {
     },
 
     handleCopy(row, column, cell, event) {
+      if (column && (column.property === 'operation' || column.label === '操作')) return;
       tool.copyTextToClip(cell.innerText, () => {
-        alert('已拷贝单元格内容');
+        this.$message.success('已拷贝单元格内容');
       });
+    },
+
+    handleFilter() {
+      this.handleEmit('filter');
+      this.showFilterDialog = true;
     },
   },
 };
@@ -438,6 +487,24 @@ export default {
       .el-pagination__sizes {
         margin-right: auto;
       }
+    }
+  }
+  .color-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    .color-preview {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      border: 1px solid var(--gray-200);
+      flex-shrink: 0;
+    }
+    .color-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
 }

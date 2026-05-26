@@ -5,13 +5,15 @@
  * @LastEditTime: 2022-11-05 10:22:17
  * @Description:
  */
-import { getCDN } from './getCDN';
+import { getCDN, openPage, getElementPath, handleSize as formatAppSize } from '@huasen/shared';
+import CONSTANT from '@/constant/index.js';
 import { jumpToRead } from './jumpToRead.js';
-import { openPage } from './openPage.js';
 import { randomInt } from './randomInt.js';
 import { judgeBgType } from './judgeBgType';
-import { handleSize } from './handleSize.js';
-import { getElementPath } from './getElementPath.js';
+
+function handleSize(size) {
+  return formatAppSize(size, CONSTANT.appMinWidth);
+}
 
 export default {
   getCDN,

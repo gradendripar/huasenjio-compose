@@ -104,7 +104,7 @@ export default {
       this.chart.setOption(option);
       this.chart.on('click', params => {
         tool.copyTextToClip(params.name, () => {
-          alert('拷贝成功');
+          this.$message.success('拷贝成功');
         });
       });
     },

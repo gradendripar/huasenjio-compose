@@ -7,11 +7,34 @@
  */
 const express = require('express');
 const router = express.Router();
-const { login, register, updatePassword, recovery, backup, quit, add, findByPage, remove, update, manageLogin, manageExist, manageInit } = require('../controller/user.controller.js');
+const {
+  login,
+  register,
+  updatePassword,
+  recovery,
+  backup,
+  quit,
+  add,
+  findByPage,
+  remove,
+  update,
+  manageLogin,
+  manageExist,
+  manageInit,
+} = require('../controller/user.controller.js');
 const { handleJWT, handleUselessParams } = require('../middleware/common.middleware.js');
 const { checkManagePower, checkManageHighestPower } = require('../middleware/power.middleware.js');
 const { checkUserAccountUnique } = require('../middleware/user.middleware.js');
 const { checkMailCode } = require('../middleware/mail.middleware.js');
+const { checkCaptcha } = require('../middleware/captcha.middleware.js');
+const { getCaptcha } = require('../controller/captcha.controller.js');
+
+/**
+ * @api {get} /user/captcha 获取图片验证码
+ * @apiVersion 1.0.0
+ * @apiGroup User
+ */
+router.get('/captcha', getCaptcha);
 
 /**
  * @api {post} /user/login 登录
@@ -19,8 +42,10 @@ const { checkMailCode } = require('../middleware/mail.middleware.js');
  * @apiGroup User
  * @apiParam {string} id 邮箱地址
  * @apiParam {string} password 密码
+ * @apiParam {string} captchaToken 验证码标识
+ * @apiParam {string} captchaCode 验证码文本
  */
-router.post('/login', login);
+router.post('/login', checkCaptcha, login);
 router.post('/register', checkMailCode, checkUserAccountUnique, handleUselessParams, register);
 router.post('/updatePassword', checkMailCode, handleUselessParams, updatePassword);
 
@@ -52,7 +77,6 @@ router.post('/quit', handleJWT(), quit);
  */
 router.post('/recovery', handleJWT(), recovery);
 
-
 /**
  * @api {post} /user/manage/login 登录管理员
  * @apiVersion 1.0.0
@@ -60,7 +84,7 @@ router.post('/recovery', handleJWT(), recovery);
  * @apiParam {string} id 管理员账号
  * @apiParam {string} password 管理员密码
  */
-router.post('/manage/login', manageLogin);
+router.post('/manage/login', checkCaptcha, manageLogin);
 
 /**
  * @api {post} /user/manage/init 初始化管理员账号

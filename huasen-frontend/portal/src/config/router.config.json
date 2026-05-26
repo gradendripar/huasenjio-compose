@@ -38,6 +38,15 @@
     "children": []
   },
   {
+    "path": "/ai",
+    "name": "AiChat",
+    "menuCode": "000",
+    "component": "ai/AiChat",
+    "title": "AI应用",
+    "keepAlive": true,
+    "children": []
+  },
+  {
     "path": "/read/:id",
     "name": "Read",
     "menuCode": "000",

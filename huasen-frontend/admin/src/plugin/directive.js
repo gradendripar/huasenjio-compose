@@ -7,6 +7,7 @@
  */
 
 import Vue from 'vue';
+import { createLazyDirective } from '@huasen/shared';
 
 import unloadImg from '@/assets/img/error/image-error.png';
 import loadImg from '@/assets/img/loading/3.gif';
@@ -22,62 +23,8 @@ Vue.directive('highlight', function (el) {
   });
 });
 
-/**
- * 获取网站域名
- * @param {String} urlString - 网站链接地址
- * @returns domain - 域名
- */
-function getDomainFromURL(urlString) {
-  try {
-    // 创建URL对象
-    const url = new URL(urlString);
-    // 获取域名
-    return url.hostname;
-  } catch (error) {
-    // 如果URL格式不正确，则返回错误信息
-    console.error('Invalid URL:', error);
-    return null;
-  }
-}
-
 // 图片标签懒加载
-Vue.directive('lazy', {
-  inserted: handleLazy,
-  componentUpdated: handleLazy, // 组件更新时触发太过频繁
-});
-function handleLazy(el, binding) {
-  if (el.dataset.loaded === 'true') {
-    return;
-  }
-  const url = el.src; // 保存原始图标地址
-  el.src = loadImg; // 替换图标为加载图标
-  el.isIconPatch = false; // 一为图标加载标记
-  const { unload = unloadImg, siteUrl, iconPatch } = binding.value || {};
-  let observe = new IntersectionObserver(([{ isIntersecting }]) => {
-    if (isIntersecting) {
-      // 元素进入可视区域触发回调
-      el.src = url;
-      el.onload = function () {
-        observe.unobserve(el);
-        // 标记图片已经加载成功
-        el.dataset.loaded = 'true';
-      };
-      el.onerror = function () {
-        if (iconPatch && !el.isIconPatch && siteUrl) {
-          // 加载补全图标
-          let domain = getDomainFromURL(siteUrl);
-          el.src = `https://favicon.im/${domain}?larger=true`;
-          el.isIconPatch = true;
-        } else {
-          // 加载失败时
-          el.src = unload;
-          observe.unobserve(el);
-        }
-      };
-    }
-  });
-  observe.observe(el);
-}
+Vue.directive('lazy', createLazyDirective({ loadImg, unloadImg }));
 
 // 自动获取焦点指令
 Vue.directive('focus', {

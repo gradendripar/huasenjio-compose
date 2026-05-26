@@ -15,7 +15,7 @@
         <el-popconfirm @confirm="remove('multiple')" class="ml-px-10" popper-class="delete-popcomfirm" title="确定删除吗？">
           <el-button slot="reference" size="mini" icon="el-icon-delete" type="danger">批量删除</el-button>
         </el-popconfirm>
-        <el-button style="margin-left: 6px" size="mini" icon="el-icon-download" type="info" @click="downloadStore">下载全部</el-button>
+        <el-button style="margin-left: 6px" size="mini" icon="el-icon-download" type="info" :loading="downloadingStore" @click="downloadStore">下载全部</el-button>
         <el-input v-model="filterText" style="width: 300px" class="ml-auto" placeholder="关键词" size="mini" clearable>
           <el-select style="width: 95px" v-model="filterType" slot="prepend" placeholder="文件类型">
             <el-option label="全部" value=""></el-option>
@@ -70,6 +70,7 @@
 <script>
 import { tool } from 'huasen-lib';
 import FileUpLoad from '@/components/common/file-upload/FileUpload.vue';
+import { downloadFileByBlob } from '@/network/request.js';
 export default {
   name: 'FileManage',
   components: { FileUpLoad },
@@ -77,12 +78,12 @@ export default {
     return {
       files: [],
       fileTypeName: {
-        default: '默认空间',
-        img: '相册',
-        icon: '图标',
-        data: '文件',
-        pdf: 'PDF',
-        zip: '压缩包',
+        default: '通用文件',
+        img: '图片素材',
+        icon: '图标素材',
+        data: '数据文件',
+        pdf: 'PDF文档',
+        zip: '压缩文件',
         article: '文章附件',
         banner: '文章封面',
         'open-sh': '开放脚本',
@@ -118,6 +119,7 @@ export default {
 
       filterType: '',
       filterText: '',
+      downloadingStore: false,
     };
   },
 
@@ -175,7 +177,13 @@ export default {
 
   methods: {
     downloadStore() {
-      this.$tips('info', '功能正在开发中...', null, 2000);
+      if (this.downloadingStore) return;
+      this.downloadingStore = true;
+      downloadFileByBlob('/file/downloadStore', {}, 'huasen-store.zip', 'application/zip', () => {
+        this.$tips('success', '已完成打包，正在下载中...', 'top-right', 2000);
+      }).finally(() => {
+        this.downloadingStore = false;
+      });
     },
 
     async upload(file, index, callback) {
@@ -208,7 +216,7 @@ export default {
     // 拷贝链接
     copy(url, index) {
       tool.copyTextToClip(url, () => {
-        alert('已拷贝链接');
+        this.$message.success('拷贝成功');
       });
     },
 

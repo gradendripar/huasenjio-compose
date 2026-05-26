@@ -7,7 +7,7 @@
  */
 import Vue from 'vue';
 // 引入组件
-import Toast from './toast/Toast';
+import { HToast } from '@huasen/ui';
 import Markdown from './markdown/Markdown.vue';
 import Scrollbar from './scrollbar/Scrollbar.vue';
 
@@ -19,7 +19,7 @@ Vue.component('HScrollbar', Scrollbar);
 const huasen = {};
 huasen.install = function(Vue) {
   // 1.创建toast构造器
-  const toastContrustor = Vue.extend(Toast);
+  const toastContrustor = Vue.extend(HToast);
   // 2.生成构造器实例
   const hToast = new toastContrustor();
   // 3.为构造器绑定元素

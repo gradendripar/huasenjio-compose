@@ -6,5 +6,5 @@
 
 # 开发环境约束
 
-- node.js 16.x
+- node.js 18.x
 - express.js 4.x

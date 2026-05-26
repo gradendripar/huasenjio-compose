@@ -16,6 +16,7 @@ import 'plugin/element-ui/index.js';
 import 'plugin/echarts.js';
 import 'plugin/awe-dnd.js';
 import 'plugin/filter.js';
+import huasen from 'components/common/index.js';
 
 import lodash from 'lodash';
 import i18n from 'config/i18n.config.js';
@@ -29,6 +30,8 @@ Vue.prototype.CONSTANT = constant;
 Vue.prototype.API = api;
 Vue.prototype.STORAGE = storage;
 Vue.prototype.LODASH = lodash;
+
+Vue.use(huasen);
 
 Vue.config.productionTip = false;
 new Vue({

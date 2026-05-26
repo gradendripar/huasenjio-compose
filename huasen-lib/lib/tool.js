@@ -76,6 +76,15 @@ export function getUid(len = 16, radix = 8) {
 }
 
 /**
+ * 获取唯一标识符
+ * @returns {String} 唯一标识符，例如：mkteczzq-47643337
+ */
+export function getUUID() {
+  const time36 = Date.now().toString(36); // 时间戳36进制：'mkteczzq'
+  return `${time36}-${getUid(8)}`;
+}
+
+/**
  * 解析JSON字符串
  * @param {String} JSONString - JSON字符串
  * @param {String} prototypeType - 原型类型，不满足时返回默认值，例如：Object, Array, String, Number, Boolean, Date, RegExp, Function, Symbol, BigInt, Undefined, Null
@@ -151,21 +160,6 @@ export function copyTextToClip(content, callback, line = false) {
 }
 
 /**
- * 格式化尺寸
- * @param {String|Number} size - 处理传入尺寸数据，例如：'100px'、'100'、100 = '100px'；'100%' = '100%'
- * @param {String} defaultSize - 默认尺寸
- */
-export function formatSize(size, defaultSize = "fit-content") {
-  if (typeof size === "string") {
-    return /^\d+(\.\d+)?(%|px)$/.test(size) ? size : `${size}px`;
-  } else if (typeof size === "number") {
-    return `${size}px`;
-  } else {
-    return defaultSize;
-  }
-}
-
-/**
  * 将传入的file对象、blob对象转换成base64字符串
  * @param {Blob|File} img - blob对象、file对象
  * @param {Function} callback - base64字符串参数的回调函数
@@ -199,4 +193,100 @@ export function handleURL(url = "", data = {}) {
   }
   // 返回拼接后的URL字符串
   return urlObj.toString();
+}
+
+/**
+ * 从 URL 或主机名字符串中提取域名（hostname），使用原生 URL 构造函数解析
+ * @param {String} urlStr - 完整 URL 或带端口的主机名，例如 'https://example.com:3000/path'、'localhost:9000'
+ * @returns {String} 解析的域名，解析失败时返回空字符串
+ */
+export function getDomain(urlStr) {
+  if (!urlStr) return "";
+  try {
+    if (!/^https?:\/\//i.test(urlStr)) {
+      urlStr = "http://" + urlStr;
+    }
+    return new URL(urlStr).hostname;
+  } catch (e) {
+    return "";
+  }
+}
+
+const MULTI_PART_PUBLIC_SUFFIXES = new Set([
+  "com.cn",
+  "net.cn",
+  "org.cn",
+  "gov.cn",
+  "edu.cn",
+  "ac.cn",
+  "co.uk",
+  "org.uk",
+  "ac.uk",
+  "gov.uk",
+  "com.au",
+  "net.au",
+  "org.au",
+  "edu.au",
+  "co.jp",
+  "ne.jp",
+  "or.jp",
+  "co.kr",
+  "ne.kr",
+  "or.kr",
+  "com.br",
+  "net.br",
+]);
+
+function isIPv4(hostname) {
+  return /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
+}
+
+function isIPv6(hostname) {
+  return hostname.includes(":");
+}
+
+/**
+ * 从 URL 或主机名字符串中提取主域名，用于授权域名绑定。
+ * @param {String} urlStr - 完整 URL 或主机名，例如 'https://www.example.com/admin'、'n.example.com'
+ * @returns {String} 主域名，解析失败时返回空字符串
+ */
+export function getPrimaryDomain(urlStr) {
+  const hostname = getDomain(urlStr).toLowerCase().replace(/\.$/, "");
+  if (
+    !hostname ||
+    hostname === "localhost" ||
+    isIPv4(hostname) ||
+    isIPv6(hostname)
+  )
+    return hostname;
+
+  const normalizedHostname = hostname.replace(/^www\./, "");
+  const parts = normalizedHostname.split(".").filter(Boolean);
+  if (parts.length <= 2) return normalizedHostname;
+
+  const suffix = parts.slice(-2).join(".");
+  const suffixLength = MULTI_PART_PUBLIC_SUFFIXES.has(suffix) ? 3 : 2;
+  return parts.slice(-suffixLength).join(".");
+}
+
+/**
+ * 获取完整URL参数地址，兼容浏览器和node环境
+ * @param {String} url - 地址，例如：/img/favicon.png
+ * @param {String} origin - 域名，例如：https://127.0.0.1:3000
+ * @returns 完整URL参数地址
+ */
+export function getFullURL(url, origin = "") {
+  if (!url) return;
+  // 若传入完整URL，直接返回
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  if (window?.location?.origin) {
+    origin = window.location.origin;
+  }
+  origin = origin.replace(/\/$/, "");
+  if (!url.startsWith("/")) {
+    url = `/${url}`;
+  }
+  return origin + url;
 }

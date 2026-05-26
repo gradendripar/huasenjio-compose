@@ -298,7 +298,7 @@ export default {
       } else if (this.mode === 'add') {
         delete this.form._id;
         delete this.form._v;
-        this.API.column.addColumn({ data: this.form }).then(res => {
+        this.API.column.addColumn({ column: this.form }).then(res => {
           this.queryData();
         });
       }
@@ -310,9 +310,6 @@ export default {
     },
 
     cancel() {
-      if (this.$refs.dialogForm) {
-        this.$refs.dialogForm.close();
-      }
       this.show = false;
     },
   },

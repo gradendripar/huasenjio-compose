@@ -2,12 +2,20 @@
  * @Autor: huasenjio
  * @Date: 2021-10-04 11:39:03
  * @LastEditors: huasenjio
- * @LastEditTime: 2023-02-04 14:29:05
+ * @LastEditTime: 2023-03-19 11:05:35
  * @Description: 后端服务配置文件
  */
 
 const path = require('path');
 const _ = require('lodash');
+
+// 加载 .env 文件（如果存在）
+try {
+  require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+  console.log('[Huasen Log]：已加载 .env 环境变量');
+} catch (err) {
+  console.log('[Huasen Log]：未找到 dotenv 模块或 .env 文件，使用默认配置。');
+}
 
 // 解析动态配置
 let setting = {};
@@ -26,8 +34,12 @@ let args = process.argv.find(row => {
 const MODE = args ? args.split('=')[1] : 'dev';
 console.log('[Huasen Log]：运行模式 MODE =', MODE);
 
-// 服务启动端口
+// 后台服务启动端口
 const PORT_SERVER = 3000;
+// 授权码校验激活地址
+const LICENSE_VERIFY_URL = MODE === 'dev' ? `http://localhost:${PORT_SERVER}/license/verify` : 'https://www.huasenjio.top/api/license/verify';
+const LICENSE_SYNC_URL = MODE === 'dev' ? `http://localhost:${PORT_SERVER}/license/center/sync` : 'https://www.huasenjio.top/api/license/center/sync';
+const LICENSE_RISK_REPORT_URL = MODE === 'dev' ? `http://localhost:${PORT_SERVER}/license/risk/report` : 'https://www.huasenjio.top/api/license/risk/report';
 
 // 黑名单资源池
 const POOL_BLACKLIST = 'POOL_BLACKLIST';
@@ -37,16 +49,18 @@ const POOL_ACCESS = 'POOL_ACCESS';
 const POOL_MAIL = 'POOL_MAIL';
 // 令牌池
 const POOL_TOKEN = 'POOL_TOKEN';
+// 图片验证码池
+const POOL_CAPTCHA = 'POOL_CAPTCHA';
 
 // 数据库连接配置，默认开发环境直接外部访问，生产环境连接docker的mongo容器
 const dbDirConnection = MODE === 'dev';
 const DB = {
-  name: 'huasenjio', // 角色名
-  password: 'Mongo12345*', // 角色密码
+  name: process.env.MONGO_APP_USERNAME || 'huasenjio', // 角色名
+  password: process.env.MONGO_APP_PASSWORD || 'Mongo12345*', // 角色密码
   ip: dbDirConnection ? '127.0.0.1' : 'mongo', // 数据库地址
   port: 37017, // 端口
-  dbName: 'huasen', // 数据库名
-  dbDirConnection
+  dbName: 'huasen', // 数据库名称
+  dbDirConnection,
 };
 
 // redis连接配置，默认开发环境直接外部访问，生产环境连接docker的redis容器
@@ -54,8 +68,8 @@ const redisDirConnection = MODE === 'dev';
 const REDIS = {
   port: 7379, // 端口号
   host: redisDirConnection ? '127.0.0.1' : 'redis', // redis地址
-  password: 'Redis12345*', // redis密码
-  redisDirConnection
+  password: process.env.REDIS_PASSWORD || 'Redis12345*', // redis密码
+  redisDirConnection,
 };
 
 // websocket配置
@@ -64,15 +78,14 @@ const WS = {
   interval: 15000,
 };
 
-
 // QQ邮箱服务配置示例
 const QQ_MAIL = {
   host: 'smtp.qq.com', // QQ邮箱厂商
   port: 465,
   secure: true,
   auth: {
-    user: 'QQ邮箱', //  QQ邮箱地址
-    pass: 'QQ邮箱mtp', //  QQ邮箱地址的mtp通行码
+    user: process.env.SMTP_QQ_USER || '', //  QQ邮箱地址
+    pass: process.env.SMTP_QQ_MTP || '', //  QQ邮箱地址的mtp通行码
   },
 };
 
@@ -82,8 +95,8 @@ const WY_MAIL = {
   port: 465,
   secure: true,
   auth: {
-    user: '163邮箱',
-    pass: '163邮箱mtp',
+    user: process.env.SMTP_WY_USER || '',
+    pass: process.env.SMTP_WY_MTP || '',
   },
 };
 
@@ -124,37 +137,47 @@ const SESSION = {
 const STORE = {
   // 文件默认允许的类型，仅支持MIME
   acceptTypes: {
-    ".jpg": "image/jpg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".gif": "image/gif",
-    ".svg": "image/svg+xml",
-    ".ico": "image/vnd.microsoft.icon",
-    ".html": "text/html",
-    ".css": "text/css",
-    ".js": "text/javascript",
-    ".mp3": "audio/mpeg",
-    ".aac": "audio/aac",
-    ".mp4": "video/mp4",
-    ".mpeg": "video/mpeg",
-    ".webm": "audio/webm",
-    ".webp": "image/webp",
-    ".json": "application/json",
-    ".pdf": "application/pdf",
-    ".rar": "application/vnd.rar",
-    ".tar": "application/x-tar",
-    ".zip": "application/zip",
-    ".7z": "application/x-7z-compressed",
-    ".bz": "application/x-bzip",
-    ".sh": "application/x-sh",
-    ".bin": "application/octet-stream",
-    ".csv": "text/csv",
-    ".doc": "application/msword",
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".xls": "application/vnd.ms-excel",
-    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ".ppt": "application/vnd.ms-powerpoint",
-    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    '.jpg': 'image/jpg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.webp': 'image/webp',
+    '.bmp': 'image/bmp',
+    '.ico': 'image/vnd.microsoft.icon',
+
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'text/javascript',
+
+    '.mp3': 'audio/mpeg',
+    '.webm': 'audio/webm',
+    '.aac': 'audio/aac',
+    '.mp4': 'video/mp4',
+    '.mpeg': 'video/mpeg',
+
+    '.csv': 'text/csv',
+    '.txt': 'text/plain',
+    '.md': 'text/markdown',
+
+    '.json': 'application/json',
+
+    '.rar': 'application/vnd.rar',
+    '.tar': 'application/x-tar',
+    '.zip': 'application/zip',
+    '.7z': 'application/x-7z-compressed',
+    '.bz': 'application/x-bzip',
+
+    '.pdf': 'application/pdf',
+    '.doc': 'application/msword',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.xls': 'application/vnd.ms-excel',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.ppt': 'application/vnd.ms-powerpoint',
+    '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+
+    '.sh': 'application/x-sh',
+    '.bin': 'application/octet-stream',
   },
 
   fileSize: 1024 * 1024 * 10, // 限制10m大小
@@ -185,7 +208,11 @@ const STATUS = {
  * 密钥格式：16位数子/字母
  * 特别注意：需要部署之前修改，否则数据无法解析
  */
-const SECRET_AES = ['dj38Ca8F8hag23nD', 'k4h9HdcXmEr83nsF'];
+const SECRET_AES = [process.env.AES_SECRET_KEY || 'dj38Ca8F8hag23nD', process.env.AES_SECRET_IV || 'k4h9HdcXmEr83nsF'];
+
+const LICENSE_SIGN_PUBLIC_KEY = process.env.LICENSE_SIGN_PUBLIC_KEY || '';
+const LICENSE_SIGN_PRIVATE_KEY = process.env.LICENSE_SIGN_PRIVATE_KEY || '';
+const LICENSE_LEASE_DAYS = Number(process.env.LICENSE_LEASE_DAYS || 7);
 
 /**
  * 非对称密钥要求：
@@ -197,44 +224,44 @@ const SECRET_AES = ['dj38Ca8F8hag23nD', 'k4h9HdcXmEr83nsF'];
 
 // 非对称公钥
 const SECRET_RSA_PUBLIC = `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAykOjPXYErze4pX/r6au/
-cHOpnWlyP5AO1qXblDbQ7ZbTO2QG4MLVqz938mCstV+urDfySTHBVbeA0iwg7iye
-WULR7+IHHdE7QQRCNpV3t+EPq4xbKvGv9m7U6E6vh+z4SRJDuX0rWzxhbdYsIQZd
-VDs8eqfbLVMjS1+BEB/S8tFsgjWpIMfMQYF1Ale3GQjy1kLturpeAVQCnAA5dXpM
-KU4I4sFpDPL58DBHziPc0UkyJCt5Y9xhEvqSaTInqzFoHKnjx1xw6bM7brsZveRT
-+x8PIqepeHpI2cxjRcLKl3v/hO1qOk2a4OrY+K3z36o7KS4DZQrN/7YBWx2p3ThL
-pQIDAQAB
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsNZP8rvM9X/kjFQhiNwY
+Yla6u4KSOwe+XEYQJFD+w3H6PdcfZNtRX0HphJ8jLLhsT5zreI+9jSjhk9nsYuj+
+vAvssRq5NJ/C0pTAY0+3Q87azWh60rvB/ZuHkz9+utINxrvFYH8ROkX84QWhegpB
+oTc4P/DhgbdkWBVIVx+woXewAlUs+rPtSva9H+u7gUIcjkeqAgC8XftuiIcwrjfe
+Xh/1X0YCCZzaeF4HsHflo7yyhg61jCh4U+geWCHpmhgenKCp3v2cdX/4cE6u9GaK
+EnuHkODhibiT6bJSzNDvUyLMv7bElmR16X25QaruMdjmDIKojEVwdbyp+TjrHRoj
+jwIDAQAB
 -----END PUBLIC KEY-----
 `;
 
 // 非对称私钥
 const SECRET_RSA_PRIVATE = `-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDKQ6M9dgSvN7il
-f+vpq79wc6mdaXI/kA7WpduUNtDtltM7ZAbgwtWrP3fyYKy1X66sN/JJMcFVt4DS
-LCDuLJ5ZQtHv4gcd0TtBBEI2lXe34Q+rjFsq8a/2btToTq+H7PhJEkO5fStbPGFt
-1iwhBl1UOzx6p9stUyNLX4EQH9Ly0WyCNakgx8xBgXUCV7cZCPLWQu26ul4BVAKc
-ADl1ekwpTgjiwWkM8vnwMEfOI9zRSTIkK3lj3GES+pJpMierMWgcqePHXHDpsztu
-uxm95FP7Hw8ip6l4ekjZzGNFwsqXe/+E7Wo6TZrg6tj4rfPfqjspLgNlCs3/tgFb
-HandOEulAgMBAAECggEAVkkgfHm6ad1FgiTeSWMhWiGdfC+ds4wLKHq8/6+a1aCA
-IFf9ryiu6k07KEUhqIZXB9UeISd+qMiNxhtZOQID02R0Fve/vXKi6ouci5ib5++1
-NaO8yMcuH90MKsZWj5ACI3oNNjY1pshNcAPr83K5odNba5/sGpva9K6banuJDFiU
-pwWn1+MsqiZ74tLRlPKteyvGw0b6OWjxMeIr7/G1O30wd6MiAKObKK/ODO9CQlC2
-wUAIbFqewudv26ZzkMDjpVsI42p0/xRGBQDt4vGGfKiBj05fofPl3kn7kLmY+edn
-/yfvONhdHjnQVzITa9DSU1IXY8lVFHEGxuWM+V3OyQKBgQDu3YFTlsiHNTcTgs/f
-LgLaMtVnjFtqu01j6F6HL9mO5ytFCE9GtaEnbNVy1z5BoAm3JgVcd63sArKFiuUn
-GuaVglCKbjhgFgwnGPI11QAvPAOB2Qu19XrTwVQa4C0lJ6JrGuZe+1gLbbF+7bLV
-+LMUOEU9o6YFWcMQ7fRrcLguAwKBgQDYxf624LgU0ThS301Y78O5r5g2ePZ/F1W6
-M1XTlSWgllYBeDezOAH12tisYCrbEpniATfhN9Lc4qlXWz+yGVNfC2PbyfTCTdhL
-kwPsf/GXM8WWe4Nid+LV5bmy5loq8dCpgXzB8w4LoFuE2ZFxr57q+32Pg04taNGP
-txajinQjNwKBgAwqiA3D3k7UrQt3XDMX2tlWQXxWr8lN5PEzwqzMCR64M4H+nFsT
-oTOq3WxN/kPFbPlBHIDLL7aXpJQcsPM+8YOn8YY7eu+Z7+CF6sBHKw0810jjzy7j
-Y/ApJql/xYzg6ereoeEwmBls6t92J+eyFRzwiMZM8YXQPpk8JXjbcuYVAoGAZrWJ
-doULM3HeSgXb1CPmjPiSGl0+DgG0cMEaDWJBrdENdyzK13PWGfNTbnkyVRJ/LwJ8
-w417r4UFz4pAp9YwFnyDGAScn+PadBR4a3pDseyp1h83pVRAejCayBU069wfjfD4
-d7z+DqwwMMYVj9QybAw09ea1B/b+NCX/6AUV+gkCgYEAqlrfNpXSaFbxCtDy4oA3
-kHRrmwkjlGj07cSBCCInw5yL1qnSPaLVaK+l4fN68+Ac0ZvH9XFYiXYLWV8vGLUm
-DyeS4WrWYM2tCoqSp/JnwReRiJPYx3lSfaB1qERyTRxKyFoMgcdybyTvIDTXiOqr
-sHAMEhW3k0BqdsBQ9KSbExU=
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCw1k/yu8z1f+SM
+VCGI3BhiVrq7gpI7B75cRhAkUP7Dcfo91x9k21FfQemEnyMsuGxPnOt4j72NKOGT
+2exi6P68C+yxGrk0n8LSlMBjT7dDztrNaHrSu8H9m4eTP3660g3Gu8VgfxE6Rfzh
+BaF6CkGhNzg/8OGBt2RYFUhXH7Chd7ACVSz6s+1K9r0f67uBQhyOR6oCALxd+26I
+hzCuN95eH/VfRgIJnNp4Xgewd+WjvLKGDrWMKHhT6B5YIemaGB6coKne/Zx1f/hw
+Tq70ZooSe4eQ4OGJuJPpslLM0O9TIsy/tsSWZHXpfblBqu4x2OYMgqiMRXB1vKn5
+OOsdGiOPAgMBAAECggEAIN4ki/Q1+ydjPmXgucRWz+hY2sNBFLGywwnOtEFNqNwF
+a/sQ/bj53d+tXJYLfqNklkOPTKBC1frUOpvVoOi3eBIrUxupcsuC9YrqW0sUwAix
+iF4z/fkh7FY9E7RIhMbIArkhzXawqAkcIGLgiYNggWt3DANklqyUfP6vrGnadZgv
+Scx0xDio568oUFU3X2EHt3kUacU/HbhyMe63+O+kEpMYazvUFQwKpslAg4uSwxNu
+dk97lOAF/8qXpbNJXwxfhKSV7Glb5qU8WWx6h2VMOjlm6zbvj33/peRfU8XfO+Vf
+78kIHbiNdZ15xZbvqNLUk3rdWbRg8J2WQ1u/R5iGWQKBgQDUzKDRZCcHhpNyy2AD
+sh2CKp4qRiiv5DK84q3C7P3EJ3ab9a5gj4LYNJ/GSZqAuSa+U08p7QcHZ2QNHARo
+QsJlpU34qO2P3949NrC8pVasduzuw3guSPAGDit5AsRu4st5ZNhkwj2PZyAONhYX
+uLN0GSRag8SerucKGYfn/2MUywKBgQDUvLKkwLM/64TaffU0h1Jah/YrQFErE4Gz
+2LtQdxxHsDdresdKB9VKsMco/C8eys4TxSuSVt0eoLfyi3lt33vrFviwOTWOh0ZU
+1zN6j3WtPPMCiysl6MFXs2KXy36pjTnNGWdG3dORHch3DKjMTm5HgxxhUHKkEPgS
+pSkmL2TXzQKBgH2F3u7kxuj3hw5VzOMhM6rOfNGu5N0sHImypJCwvtfv91TzzNKE
+lMf38q9CR3LaxHHMLowqltTVNf1No4PkrUrMAXxGGSufADbXhdUhKkk9NXF5t/CF
+caAAx7/v0/McsK2AwOxeb3WhfRUk7k870g8PrZP+2gJIZVxdxv8gdE+VAoGBAIJ7
+XsMoookRJwJwgWZ/naaDgBzVLTPTmhk6VOGsvP7HeaaFvxiMJ2nRdcaQr0IeuDlu
+FSSD/ModX9X3cDpQ+gueolhMLqpGFIBTInMI7O+d05t6yrNMyNHG6DEckoriYVKI
+Q003H94BO4SxkhMGBCP+qfiSRE6XTeD5xnxyU1L9AoGAaON1foC3Msz9Ng64BRKD
+Kufv/1TVjL1/iqizBEh/EzLBxbY4aaXbwHUImslF5AaIY8nbVxPEHbRiIcfX7Rmf
+9NicjdycbvwYlI6qqk0mKVr/SJrH9b+EzANOdXP358o9T1ADHuxBwRVUZZvHVrGU
+79WOXYmDUgXb8o6IGzODl10=
 -----END PRIVATE KEY-----
 `;
 
@@ -256,13 +283,20 @@ module.exports = {
   SITE,
 
   PORT_SERVER,
+  LICENSE_VERIFY_URL,
+  LICENSE_SYNC_URL,
+  LICENSE_RISK_REPORT_URL,
 
   POOL_BLACKLIST,
   POOL_ACCESS,
   POOL_MAIL,
   POOL_TOKEN,
+  POOL_CAPTCHA,
 
   SECRET_AES,
   SECRET_RSA_PUBLIC,
   SECRET_RSA_PRIVATE,
+  LICENSE_SIGN_PUBLIC_KEY,
+  LICENSE_SIGN_PRIVATE_KEY,
+  LICENSE_LEASE_DAYS,
 };

@@ -8,7 +8,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { add, findByPage, findAllByList, remove, findById, update, findByCode } = require('../controller/article.controller.js');
+const { add, findByPage, findByList, remove, findById, update, findByCode } = require('../controller/article.controller.js');
 
 const { handleJWT, handleUselessParams } = require('../middleware/common.middleware.js');
 const { checkManagePower } = require('../middleware/power.middleware.js');
@@ -17,7 +17,7 @@ router.post('/add', handleJWT(), checkManagePower, handleUselessParams, add);
 router.post('/update', handleJWT(), checkManagePower, update);
 router.get('/remove', handleJWT(), checkManagePower, remove);
 router.post('/findByPage', handleJWT(), checkManagePower, findByPage);
-router.get('/findByList', handleJWT(), checkManagePower, findAllByList);
+router.get('/findByList', handleJWT(), checkManagePower, findByList);
 
 // 用户调用&管理员
 router.get('/findById', handleJWT(false), findById);

@@ -58,7 +58,10 @@
                   <template slot="prepend">
                     <div class="input__prepend flex items-center justify-between">
                       访问源
-                      <el-tooltip content="用于拼接整站资源访问地址，例如：协议://域名，末尾不用添加/，建议输入值与主站location.origin一致！" placement="bottom">
+                      <el-tooltip
+                        content="系统资源访问源，用于图片、sitemap.xml生成等，格式为协议://域名，末尾不用添加/，例如：https://www.huasenjio.top，建议输入值与起始页location.origin一致！"
+                        placement="bottom"
+                      >
                         <i class="el-icon-info"></i>
                       </el-tooltip>
                     </div>
@@ -140,7 +143,7 @@
                 <div class="setting__form-item">
                   <div class="setting__form-item__label">
                     网链图标自动补全策略
-                    <el-tooltip content="开启状态下，若链接图标未配置或加载失败，则自动请求favicon.im补全显示。" placement="right">
+                    <el-tooltip content="是否开启起始页导航网站图标自动补全策略，开启后，若图标未配置或加载失败，则自动请求 favicon.im 显示推荐图标。" placement="right">
                       <i class="el-icon-info text-gray-600"></i>
                     </el-tooltip>
                   </div>
@@ -157,11 +160,24 @@
                   </div>
                 </div>
               </el-form-item>
+              <el-form-item v-if="licenseAuthorized" prop="hideCopyrightNotice">
+                <div class="setting__form-item">
+                  <div class="setting__form-item__label">
+                    版权声明
+                    <el-tooltip content="控制起始页侧栏版权声明卡片是否显示" placement="right">
+                      <i class="el-icon-info text-gray-600"></i>
+                    </el-tooltip>
+                  </div>
+                  <div class="setting__form-item__value">
+                    <el-switch v-model="site.hideCopyrightNotice" active-text="隐藏" inactive-text="显示"> </el-switch>
+                  </div>
+                </div>
+              </el-form-item>
               <el-form-item prop="cityCode">
                 <div class="setting__form-item">
                   <div class="setting__form-item__label">
                     默认城市
-                    <el-tooltip content="网站默认显示已选城市的天气信息" placement="right">
+                    <el-tooltip content="起始页的默认城市，用于展示天气信息。" placement="right">
                       <i class="el-icon-info text-gray-600"></i>
                     </el-tooltip>
                   </div>
@@ -176,7 +192,7 @@
                 <div class="setting__form-item">
                   <div class="setting__form-item__label">
                     公告文章
-                    <el-tooltip content="选择已发布文章作为网站公告" placement="right">
+                    <el-tooltip content="选择起始页的文章，用于展示网站公告。" placement="right">
                       <i class="el-icon-info text-gray-600"></i>
                     </el-tooltip>
                   </div>
@@ -333,19 +349,17 @@
         <template slot="title">
           <div class="flex items-center"><i class="el-icon-table-lamp mr-px-4"></i>配置代码总览<font class="text-red-500"></font></div>
         </template>
-        <el-alert title="点击「SAVE」保存手动修改的配置代码，需要注意，您的输入不会被校验，请确保正确性，否则网站无法启动！" type="warning" show-icon :closable="false"> </el-alert>
+        <el-alert
+          title="请确保手动修改配置代码的正确性，对于未表单化的配置项，保存时不会被校验拦截，务必谨慎操作，否则可能造成系统异常！"
+          type="warning"
+          show-icon
+          :closable="false"
+        >
+        </el-alert>
         <el-row class="mt-px-8" :gutter="10">
           <el-col :span="24">
             <div class="result">
-              <VueJsonEditor
-                class="json-edit"
-                v-model="setting"
-                :show-btns="true"
-                :expandedOnStart="true"
-                mode="view"
-                :modes="['code', 'view']"
-                @json-save="handleJSONSave"
-              ></VueJsonEditor>
+              <VueJsonEditor class="json-edit" v-model="setting" :show-btns="false" :expandedOnStart="true" mode="view" :modes="['code', 'view']"></VueJsonEditor>
             </div>
           </el-col>
         </el-row>
@@ -391,6 +405,7 @@ export default {
         headHtml: '',
         bodyHtml: '',
         footerHtml: '',
+        hideCopyrightNotice: false,
         openLabelClassification: false,
         autoIconPatch: false,
         jwt: 'abcdefghyjklmnobqrstuvwhyz123456',
@@ -457,12 +472,15 @@ export default {
       originPure: [],
       originWallpaper: [],
       settingKeys: [],
+      licenseAuthorized: false,
     };
   },
 
   activated() {
     this.queryCity();
-    this.queryConfig();
+    this.queryLicenseStatus().finally(() => {
+      this.queryConfig();
+    });
     this.queryArticle();
   },
 
@@ -476,11 +494,32 @@ export default {
         }
         return json;
       },
-      set(val) {},
+      set(val) {
+        this.applySetting(val);
+      },
     },
   },
 
   methods: {
+    /**
+     * 应用配置草稿
+     * @param {Object} json - 配置数据
+     */
+    applySetting(json) {
+      if (Object.prototype.toString.call(json) !== '[object Object]') return;
+      this.settingKeys = Object.keys(json);
+      for (let key of this.settingKeys) {
+        if (['site', 'mail', 'theme'].includes(key)) {
+          // 保持表单model对象引用，避免影响Element表单的重置与校验状态
+          this.TOOL.overrideKeys(this[key], json[key]);
+        } else {
+          this.$set(this, key, json[key]);
+        }
+      }
+      if (this.site && this.site.hideCopyrightNotice === undefined) this.$set(this.site, 'hideCopyrightNotice', false);
+      if (!this.licenseAuthorized && this.site) this.site.hideCopyrightNotice = false;
+    },
+
     /**
      * 判断是否为默认主题
      * @param type - 主题数据类型，例如：pure | wallpaper
@@ -493,32 +532,6 @@ export default {
       } else if (type === 'wallpaper') {
         return this.theme.default.bg === item.background && this.theme.default.color === item.headerFontColor && this.theme.default.order === index;
       }
-    },
-
-    /**
-     * 保存配置代码
-     * @param {Object} json - json数据
-     */
-    handleJSONSave(json) {
-      this.$confirm('该操作将忽略上面所有表单输入项，并且保存编辑器中的代码作为最新配置，您确定吗？', '保存配置代码', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning',
-      })
-        .then(() => {
-          let that = this;
-          this.settingKeys = Object.keys(json);
-          for (let key of this.settingKeys) {
-            if (['site', 'mail', 'theme'].includes(key)) {
-              // 对于表单输入项，采取同名覆盖策略，忽略undefined
-              this.TOOL.overrideKeys(that[key], json[key]);
-            } else {
-              that[key] = json[key];
-            }
-          }
-          this.saveConfig();
-        })
-        .catch(() => {});
     },
 
     /**
@@ -552,10 +565,28 @@ export default {
         for (let key of this.settingKeys) {
           this[key] = res.data[key];
         }
+        if (this.site.hideCopyrightNotice === undefined) this.$set(this.site, 'hideCopyrightNotice', false);
+        if (!this.licenseAuthorized) this.site.hideCopyrightNotice = false;
         this.originPure = this.LODASH.cloneDeep(this.theme.pure);
         this.originWallpaper = this.LODASH.cloneDeep(this.theme.wallpaper);
         this.loaded = true;
       });
+    },
+
+    /**
+     * 查询高级版授权状态
+     */
+    queryLicenseStatus() {
+      return this.API.ai
+        .getLicenseStatus({}, { notify: false })
+        .then(res => {
+          this.licenseAuthorized = !!this.LODASH.get(res, 'data.authorized');
+          if (!this.licenseAuthorized && this.site) this.site.hideCopyrightNotice = false;
+        })
+        .catch(() => {
+          this.licenseAuthorized = false;
+          if (this.site) this.site.hideCopyrightNotice = false;
+        });
     },
 
     /**

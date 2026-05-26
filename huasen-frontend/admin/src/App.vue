@@ -15,7 +15,7 @@
   </div>
 </template>
 <script>
-import BrowserTips from '@/components/content/browser-tips/BrowserTips.vue';
+import { HBrowserTips as BrowserTips } from '@huasen/ui';
 import Wrap from '@/components/content/wrap/Wrap.vue';
 import Sign from '@/components/content/sign/Sign.vue';
 import { tool } from 'huasen-lib';

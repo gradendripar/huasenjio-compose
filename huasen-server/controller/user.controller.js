@@ -10,14 +10,14 @@ const { encrypt, decrypt } = require('huasen-lib');
 const JWT = require('../plugin/jwt.js');
 const { SECRET_AES } = require('../config.js');
 const { offlineByKey } = require('./common.controller.js');
-const { User } = require('../service/index.js').schemaMap;
+const { user } = require('../service/index.js').schemaMap;
 
 function login(req, res, next) {
   let { id, password } = req.huasenParams;
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'find',
         payloads: [
           {
@@ -67,7 +67,7 @@ function register(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'insertMany',
         payloads: [{ id, password: encryptPassword }],
       },
@@ -84,7 +84,7 @@ function updatePassword(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'updateOne',
         payloads: [{ id }, { $set: { password: encryptPassword } }, { runValidators: true }],
       },
@@ -102,7 +102,7 @@ function backup(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'updateOne',
         payloads: [{ id: proof.key }, { $set: { records, config } }, { runValidators: true }],
       },
@@ -118,7 +118,7 @@ function recovery(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'find',
         payloads: [
           {
@@ -152,7 +152,7 @@ function findByPage(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'findByPage',
         payloads: [
           {
@@ -176,7 +176,7 @@ function add(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'insertMany',
         payloads: [req.huasenParams],
       },
@@ -193,7 +193,7 @@ function remove(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'find',
         payloads: [{ _id }],
       },
@@ -203,7 +203,7 @@ function remove(req, res, next) {
       if (userId === proof.key) {
         global.huasen.responseData(res, {}, 'ERROR', '无法删除自己');
       } else {
-        const result = await User.deleteOne({ _id });
+        const result = await user.deleteOne({ _id });
         await JWT.destroyTokenByKey(userId);
         global.huasen.responseData(res, result, 'SUCCESS', '已删除');
       }
@@ -214,11 +214,10 @@ function remove(req, res, next) {
 function update(req, res, next) {
   // 解析修改的记录索引
   let { _id, password, code } = req.huasenParams;
-  let { proof } = req.huasenJWT;
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'find',
       },
     ],
@@ -232,16 +231,25 @@ function update(req, res, next) {
         if (user.password !== password) {
           req.huasenParams.password = encrypt(password, SECRET_AES);
         }
-        if (user.code === 3 && manages.length < 2 && code < user.code) {
+        if (manages.length <= 1 && code < user.code && user.code === 3) {
           global.huasen.responseData(res, {}, 'ERROR', '至少保留一个作者权限账号');
         } else {
-          // 管理员默认启用账号
-          if (code >= 2) {
+          // 作者权限账号默认启用，避免禁用后无法登录
+          if (code === 3) {
             req.huasenParams.enabled = true;
           }
-          const result = await User.updateOne({ _id }, { $set: req.huasenParams }, { runValidators: true });
+          const [err, result] = await req.working([
+            {
+              schemaName: 'user',
+              methodName: 'updateOne',
+              payloads: [{ _id }, { $set: req.huasenParams }, { runValidators: true }],
+            },
+          ]);
+          if (err) {
+            global.huasen.responseData(res, {}, 'ERROR', err.message);
+          }
           await JWT.destroyTokenByKey(user.id);
-          global.huasen.responseData(res, result, 'SUCCESS', '已更新');
+          global.huasen.responseData(res, result, 'SUCCESS', '账号信息已更新');
         }
       }
     },
@@ -258,7 +266,7 @@ function manageLogin(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'find',
         payloads: [
           {
@@ -281,6 +289,10 @@ function manageLogin(req, res, next) {
             id,
             token,
             code: manage.code,
+            name: manage.name,
+            headImg: manage.headImg,
+            records: manage.records,
+            config: manage.config,
           },
           'SUCCESS',
           '已登录',
@@ -293,11 +305,11 @@ function manageLogin(req, res, next) {
   );
 }
 
-async function manageExist(req, res, next) {
+function manageExist(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'find',
         payloads: [
           {
@@ -307,7 +319,7 @@ async function manageExist(req, res, next) {
         ],
       },
     ],
-    async manages => {
+    manages => {
       const manage = manages[0];
       if (!manage) {
         global.huasen.responseData(res, false, 'SUCCESS', '请添加管理员账号');
@@ -322,7 +334,7 @@ async function manageInit(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'find',
         payloads: [
           {

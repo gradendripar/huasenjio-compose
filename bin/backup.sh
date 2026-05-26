@@ -1,5 +1,7 @@
 #!/bin/bash
 SH_DIR=$(cd $(dirname "$0") && pwd)
+# 引入环境配置函数库
+source "$SH_DIR/env-lib.sh"
 BACKUP_DIR="${SH_DIR}/../../huasen-backup"
 PROJECT_DIR="${SH_DIR}/.."
 CUR_DATE=$(date +%Y%m%d%H%M%S)
@@ -11,7 +13,7 @@ mkdir -p $DATE_FOLDER
 
 echo "[Huasen Log]：停止docker容器..."
 cd $PROJECT_DIR
-docker-compose stop
+$DOCKER_COMPOSE stop
 
 # cp "${PROJECT_DIR}"/huasen-mongo/init-mongo* "$BACKUP_DIR"
 # cp "${PROJECT_DIR}"/huasen-redis/conf/redis* "$BACKUP_DIR"
@@ -27,6 +29,14 @@ docker-compose stop
 echo "[Huasen Log]：正在备份网站关键配置文件至${DATE_FOLDER} 中，如需恢复，请手动恢复到项目对应目录下！"
 
 cp "${PROJECT_DIR}"/docker-compose.yml "$DATE_FOLDER"
+
+# 备份 .env 文件（如果存在）
+if [ -f "${PROJECT_DIR}/.env" ]; then
+    cp "${PROJECT_DIR}/.env" "$DATE_FOLDER"
+    echo "[Huasen Log]：已备份 .env 配置文件"
+else
+    echo "[Huasen Log]：警告：.env 文件不存在"
+fi
 
 backup_service() {
     local service_name=$1
@@ -49,6 +59,6 @@ backup_service "huasen-lib"
 backup_service "huasen-server"
 
 echo "[Huasen Log]：重新启动docker容器..."
-docker-compose start
+$DOCKER_COMPOSE start
 
 echo "[Huasen Log]：压缩备份数据成功..."

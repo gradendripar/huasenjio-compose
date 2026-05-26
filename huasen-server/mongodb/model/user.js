@@ -45,10 +45,10 @@ let UserSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       validate: {
-        validator: function (desc) {
+        validator: function (powerCode) {
           try {
-            if (!Number.isInteger(desc)) false;
-            if (desc > 3 || desc < -1) return false;
+            if (!Number.isInteger(powerCode)) false;
+            if (powerCode > 3 || powerCode < -1) return false;
             return true;
           } catch (error) {
             return false;
@@ -69,9 +69,9 @@ let UserSchema = new mongoose.Schema(
       type: String,
       default: '[]',
       validate: {
-        validator: function (desc) {
+        validator: function (text) {
           try {
-            let temp = JSON.parse(desc);
+            let temp = JSON.parse(text);
             if (Object.prototype.toString.call(temp) === '[object Array]') {
               return temp.every(item => {
                 return (
@@ -95,19 +95,6 @@ let UserSchema = new mongoose.Schema(
     config: {
       type: String,
       default: '{}',
-      validate: {
-        validator: function (desc) {
-          try {
-            let temp = JSON.parse(desc);
-            if (Object.prototype.toString.call(temp) === '[object Object]') {
-              return true;
-            }
-          } catch (err) {
-            return false;
-          }
-        },
-        message: '请输入正确{}格式的JSON',
-      },
     },
   },
   {
@@ -118,5 +105,5 @@ let UserSchema = new mongoose.Schema(
   },
 );
 
-const User = mongoose.model('users', UserSchema);
+const User = mongoose.model('user', UserSchema);
 module.exports = User;

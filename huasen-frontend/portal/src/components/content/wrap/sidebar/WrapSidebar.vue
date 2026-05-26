@@ -41,15 +41,12 @@ export default {
   components: {
     IconBox,
   },
-  data() {
-    return {};
-  },
   computed: {
     ...mapState(['showWrapSidebarSocket', 'asideConfig', 'appConfig', 'user']),
     displayAsidebar() {
       // 未经授权，版权声明不可移除，否则视作侵权行为，后果自负！
       // Without authorization, the copyright notice cannot be removed, otherwise it will be regarded as infringement and the consequences will be borne by you!
-      if (this.appConfig.site.authorization) {
+      if (this.LODASH.get(this.appConfig, 'site.hideCopyrightNotice')) {
         return this.asideConfig;
       } else {
         return [

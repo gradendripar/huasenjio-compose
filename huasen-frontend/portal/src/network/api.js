@@ -18,6 +18,7 @@ import Article from './address/article.js';
 import Journal from './address/journal.js';
 import Site from './address/site.js';
 import Weather from './address/weather.js';
+import AI from './address/ai.js';
 
 // mock功能
 const mock = get('/mock/test', {
@@ -53,5 +54,6 @@ export default {
   Article,
   Journal,
   Site,
-  Weather
+  Weather,
+  AI,
 };

@@ -5,6 +5,212 @@
  * @LastEditTime: 2023-03-24 20:14:28
  * @Description: 订阅表控制器
  */
+const { working } = require('../service/index.js');
+
+/**
+ * 获取订阅源的栏目及站点
+ * @param {string} _id - 订阅源id
+ * @param {number} code - 权限码
+ * @returns
+ */
+async function getJournalInformationById(_id, code = 0) {
+  const [err, journal, j2cs] = await working([
+    {
+      schemaName: 'journal',
+      methodName: 'findOne',
+      payloads: [
+        {
+          _id,
+          code: { $lte: code },
+          enabled: true,
+        },
+      ],
+    },
+    {
+      schemaName: 'journal2column',
+      methodName: 'find',
+      payloads: [
+        {
+          journalId: _id,
+        },
+        {},
+        { sort: { order: 1 } },
+      ],
+    },
+  ]);
+  if (err || !journal) {
+    return null;
+  }
+  let fullJournal = {
+    _id: journal._id.toString(),
+    name: journal.name,
+    code: journal.code,
+    expand: journal.expand,
+    creatTime: journal.creatTime,
+    updateTime: journal.updateTime,
+    series: [],
+  };
+  if (j2cs.length === 0) {
+    return fullJournal;
+  }
+  const columnIds = j2cs.map(item => item.columnId);
+  const [err2, columns, c2ss] = await working([
+    {
+      schemaName: 'column',
+      methodName: 'find',
+      payloads: [
+        {
+          _id: { $in: columnIds },
+          enabled: true,
+          code: { $lte: code },
+        },
+      ],
+    },
+    {
+      schemaName: 'column2site',
+      methodName: 'find',
+      payloads: [
+        {
+          columnId: { $in: columnIds },
+        },
+        {},
+        { sort: { order: 1 } },
+      ],
+    },
+  ]);
+  if (err2) {
+    return null;
+  }
+  const siteIds = Array.from(new Set(c2ss.map(item => item.siteId)));
+  if (siteIds.length === 0) {
+    return fullJournal;
+  }
+  const [err3, sites, site2pins, site2tags] = await working([
+    {
+      schemaName: 'site',
+      methodName: 'find',
+      payloads: [
+        {
+          _id: { $in: siteIds },
+          code: { $lte: code },
+          enabled: true,
+        },
+      ],
+    },
+    {
+      schemaName: 'site2pin',
+      methodName: 'find',
+      payloads: [
+        {
+          siteId: { $in: siteIds },
+        },
+      ],
+    },
+    {
+      schemaName: 'site2tag',
+      methodName: 'find',
+      payloads: [
+        {
+          siteId: { $in: siteIds },
+        },
+      ],
+    },
+  ]);
+  if (err3) {
+    return null;
+  }
+  const pinIds = Array.from(new Set(site2pins.map(item => item.pinId)));
+  const tagIds = Array.from(new Set(site2tags.map(item => item.tagId)));
+  const [err4, pins, tags] = await working([
+    {
+      schemaName: 'pin',
+      methodName: 'find',
+      payloads: [{ _id: { $in: pinIds } }],
+    },
+    {
+      schemaName: 'tag',
+      methodName: 'find',
+      payloads: [{ _id: { $in: tagIds } }],
+    },
+  ]);
+  if (err4) {
+    return null;
+  }
+  const sitePinMap = {};
+  const siteTagMap = {};
+  site2pins.forEach(item => {
+    if (!sitePinMap[item.siteId]) sitePinMap[item.siteId] = [];
+    sitePinMap[item.siteId].push(item.pinId);
+  });
+  site2tags.forEach(item => {
+    if (!siteTagMap[item.siteId]) siteTagMap[item.siteId] = [];
+    siteTagMap[item.siteId].push(item.tagId);
+  });
+  const pinMap = {};
+  pins.forEach(pin => {
+    const pinId = pin._id.toString();
+    pinMap[pinId] = {
+      id: pinId,
+      name: pin.name,
+      color: pin.color,
+      bgColor: pin.bgColor,
+    };
+  });
+  const tagMap = {};
+  tags.forEach(tag => {
+    tagMap[tag._id.toString()] = tag.name;
+  });
+  const columnMap = {};
+  columns.forEach(column => {
+    const columnId = column._id.toString();
+    columnMap[columnId] = {
+      typeId: columnId,
+      typeName: column.name,
+      description: column.description,
+      banner: column.banner,
+      remarks: column.remarks,
+      expand: column.expand,
+      creatTime: column.creatTime,
+      updateTime: column.updateTime,
+      sites: [],
+    };
+  });
+  const siteMap = {};
+  sites.forEach(site => {
+    const siteId = site._id.toString();
+    siteMap[siteId] = {
+      _id: siteId,
+      name: site.name,
+      url: site.url,
+      icon: site.icon,
+      code: site.code,
+      expand: site.expand,
+      description: site.description,
+      remarks: site.remarks,
+      detail: site.detail,
+      hasDetail: !!site.detail,
+      creatTime: site.creatTime,
+      updateTime: site.updateTime,
+      pins: (sitePinMap[siteId] || []).map(pinId => pinMap[pinId]).filter(Boolean),
+      tags: (siteTagMap[siteId] || []).map(tagId => tagMap[tagId]).filter(Boolean),
+    };
+  });
+  columnIds.forEach(columnId => {
+    const fullColumn = columnMap[columnId];
+    if (fullColumn) {
+      fullJournal.series.push(fullColumn);
+    }
+  });
+  c2ss.forEach(c2s => {
+    const fullColumn = columnMap[c2s.columnId];
+    const site = siteMap[c2s.siteId];
+    if (fullColumn && site) {
+      fullColumn.sites.push(site);
+    }
+  });
+  return fullJournal;
+}
+
 function findByPage(req, res, next) {
   let { pageNo, pageSize, name, enabled, code } = req.huasenParams;
   // 模糊查询参数
@@ -18,7 +224,7 @@ function findByPage(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Journal',
+        schemaName: 'journal',
         methodName: 'findByPage',
         payloads: [
           {
@@ -40,7 +246,7 @@ function add(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Journal',
+        schemaName: 'journal',
         methodName: 'insertMany',
         payloads: [req.huasenParams],
       },
@@ -56,11 +262,20 @@ function remove(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Journal',
+        schemaName: 'journal',
         methodName: 'deleteOne',
         payloads: [
           {
             _id,
+          },
+        ],
+      },
+      {
+        schemaName: 'journal2column',
+        methodName: 'deleteMany',
+        payloads: [
+          {
+            journalId: _id,
           },
         ],
       },
@@ -76,7 +291,7 @@ function update(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Journal',
+        schemaName: 'journal',
         methodName: 'updateOne',
         payloads: [{ _id }, { $set: req.huasenParams }, { runValidators: true }],
       },
@@ -96,7 +311,7 @@ function findByCode(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Journal',
+        schemaName: 'journal',
         methodName: 'find',
         payloads: [
           {
@@ -119,7 +334,7 @@ function findAll(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Journal',
+        schemaName: 'journal',
         methodName: 'find',
         payloads: [
           {
@@ -141,103 +356,119 @@ function findAll(req, res, next) {
 }
 
 // 查询订阅源下的栏目和站点
-function findJournalInformationById(req, res, next) {
+async function findJournalInformationById(req, res, next) {
   let { _id } = req.huasenParams;
   let { proof } = req.huasenJWT;
-  req.epWorking(
-    [
-      {
-        schemaName: 'Journal',
-        methodName: 'find',
-        payloads: [
-          {
-            _id,
-            code: { $lte: proof.code },
-            enabled: true,
-          },
-        ],
-      },
-      {
-        schemaName: 'Column',
-        methodName: 'find',
-        payloads: [
-          {
-            code: { $lte: proof.code },
-            enabled: true,
-          },
-        ],
-      },
-      {
-        schemaName: 'Site',
-        methodName: 'find',
-        payloads: [
-          {
-            code: { $lte: proof.code },
-            enabled: true,
-          },
-        ],
-      },
-    ],
-    (journals, columns, siteList) => {
-      if (journals.length !== 0) {
-        let journal = journals.shift();
-        let columnStore = JSON.parse(journal.columnStore);
-        let displayColumns = [];
-        columnStore.forEach(colId => {
-          let column;
-          columns.some(colItem => {
-            if (colItem._id == colId) {
-              column = colItem;
-              return true;
-            }
-          });
-          if (column) {
-            let typeName = column.name;
-            let sites = [];
-            let siteStore = JSON.parse(column.siteStore);
-            siteStore.forEach(sitId => {
-              siteList.some(sitItem => {
-                if (sitItem._id == sitId) {
-                  let { _id, name, url, icon, code, expand, description, detail, remarks } = sitItem;
-                  sites.push({
-                    _id,
-                    name,
-                    url,
-                    icon,
-                    code,
-                    expand,
-                    description,
-                    remarks,
-                    hasDetail: !!detail,
-                  });
-                  return true;
-                }
-              });
-            });
-            displayColumns.push({
-              typeId: column._id,
-              typeName,
-              sites,
-            });
-          }
-        });
-        global.huasen.responseData(
-          res,
-          {
-            _id: journal._id,
-            name: journal.name,
-            code: journal.code,
-            expand: journal.expand,
-            series: displayColumns,
-          },
-          'SUCCESS',
-          '查询订阅',
-        );
-      } else {
-        global.huasen.responseData(res, {}, 'ERROR', '订阅源已废弃');
-      }
+  const fullJournal = await getJournalInformationById(_id, proof.code);
+  if (!fullJournal) {
+    return global.huasen.responseData(res, {}, 'ERROR', '订阅源不存在');
+  }
+  global.huasen.responseData(res, fullJournal, 'SUCCESS', '查询订阅源关联信息');
+}
+
+async function findBindedColumn(req, res, next) {
+  let { journalId } = req.huasenParams;
+  const [cErr, journal2columns] = await req.working([
+    {
+      schemaName: 'journal2column',
+      methodName: 'find',
+      payloads: [{ journalId }, {}, { sort: { order: 1 } }],
     },
-  );
+  ]);
+  if (cErr) {
+    return global.huasen.responseData(res, null, 'ERROR', '查询绑定栏目');
+  }
+  let columnIds = journal2columns.map(item => item.columnId);
+  const [sErr, columns] = await req.working([
+    {
+      schemaName: 'column',
+      methodName: 'find',
+      payloads: [{ _id: { $in: columnIds } }],
+    },
+  ]);
+  if (sErr) {
+    return global.huasen.responseData(res, null, 'ERROR', '查询绑定栏目');
+  }
+  // 创建栏目ID到栏目对象的映射，便于按顺序排列
+  const columnMap = {};
+  columns.forEach(column => {
+    columnMap[column._id] = column;
+  });
+  const orderedColumns = journal2columns.map(relation => columnMap[relation.columnId]).filter(column => column); // 过滤掉可能不存在的栏目
+  global.huasen.responseData(res, { columns: orderedColumns }, 'SUCCESS', '查询绑定栏目');
+}
+
+// 解除栏目和站点的关系
+async function unbindColumn(req, res, next) {
+  let { journalId, columnIds } = req.huasenParams;
+  const [cErr, columns] = await req.working([
+    {
+      schemaName: 'journal2column',
+      methodName: 'deleteMany',
+      payloads: [{ journalId, columnId: { $in: columnIds } }],
+    },
+  ]);
+  if (cErr) {
+    return global.huasen.responseData(res, null, 'ERROR', '取消绑定栏目');
+  }
+  global.huasen.responseData(res, columns, 'SUCCESS', '取消绑定栏目');
+}
+
+async function bindColumn(req, res, next) {
+  let { journalId, columnIds } = req.huasenParams;
+  // 查询journalId关联的栏目数量，用于判断确定order的起始值
+  const [countErr, targetJ2C] = await req.working([
+    {
+      schemaName: 'journal2column',
+      methodName: 'findOne',
+      payloads: [{ journalId }],
+    },
+  ]);
+  if (countErr) {
+    return global.huasen.responseData(res, null, 'ERROR', '查询绑定栏目关系');
+  }
+  let startOrder = 0;
+  if (targetJ2C?.order) {
+    startOrder = targetJ2C.order;
+  }
+  const [cErr, journal2columns] = await req.working([
+    {
+      schemaName: 'journal2column',
+      methodName: 'insertMany',
+      payloads: columnIds.map(columnId => {
+        startOrder = startOrder + 1;
+        return { journalId, columnId, order: startOrder };
+      }),
+    },
+  ]);
+  if (cErr) {
+    return global.huasen.responseData(res, null, 'ERROR', '绑定栏目');
+  }
+  global.huasen.responseData(res, journal2columns, 'SUCCESS', '绑定栏目');
+}
+
+// 根据传递的columnIds数组，更新栏目关联站点的顺序
+async function updateBindedColumnOrder(req, res, next) {
+  let { journalId, columnIds } = req.huasenParams;
+  console.log(columnIds);
+  // 创建批量更新操作
+  const operations = columnIds.map((columnId, index) => ({
+    updateOne: {
+      filter: { journalId, columnId },
+      update: { $set: { order: index } },
+    },
+  }));
+  const [cErr, result] = await req.working([
+    {
+      schemaName: 'journal2column',
+      methodName: 'bulkWrite',
+      payloads: [operations],
+    },
+  ]);
+  if (cErr) {
+    return global.huasen.responseData(res, null, 'ERROR', '更新绑定栏目顺序失败');
+  }
+  global.huasen.responseData(res, result, 'SUCCESS', '更新绑定栏目顺序成功');
 }
 
 module.exports = {
@@ -248,4 +479,9 @@ module.exports = {
   findByCode,
   findAll,
   findJournalInformationById,
+  findBindedColumn,
+  updateBindedColumnOrder,
+  unbindColumn,
+  bindColumn,
+  getJournalInformationById,
 };

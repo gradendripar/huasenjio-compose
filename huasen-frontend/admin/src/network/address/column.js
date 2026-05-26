@@ -14,7 +14,10 @@ const addColumn = post('/column/add');
 const removeColumn = post('/column/remove');
 const updateColumn = post('/column/update');
 const findColumnByList = post('/column/list');
-const bindSiteToColumn = post('/column/bindSite');
-const unbindSiteToColumn = post('/column/unbindSite');
 
-export { findColumnByPage, addColumn, removeColumn, updateColumn, findColumnByList, bindSiteToColumn, unbindSiteToColumn };
+const findBindedSite = post('/column/findBindedSite');
+const updateBindedSiteOrder = post('/column/updateBindedSiteOrder');
+const unbindSite = post('/column/unbindSite');
+const bindSite = post('/column/bindSite');
+
+export { findColumnByPage, addColumn, removeColumn, updateColumn, findColumnByList, findBindedSite, updateBindedSiteOrder, unbindSite, bindSite };

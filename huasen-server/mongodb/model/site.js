@@ -38,21 +38,9 @@ let SiteSchema = new mongoose.Schema(
     detail: {
       type: String,
     },
-    // 拓展对象
     expand: {
       type: String,
       default: '{}',
-      validate: {
-        validator: function (desc) {
-          try {
-            let config = JSON.parse(desc);
-            if (Object.prototype.toString.call(config) === '[object Object]') return true;
-          } catch (err) {
-            return false;
-          }
-        },
-        message: '请输入JSON对象',
-      },
     },
     // 链接是否可用
     enabled: {

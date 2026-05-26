@@ -6,7 +6,7 @@
  * @Description: 
 -->
 <template>
-  <HsDialog title="JSON编辑器" :fullscreen="true" :visible="visible" :buttons="{ cancel: '关 闭' }" @closeDialog="close" @close="close">
+  <HDialog title="JSON编辑器" :fullscreen="true" :visible="visible" :buttons="{ cancel: '关 闭' }" @cancelDialog="close" @close="close">
     <div class="json-tool">
       <div class="json-tool-top-panel">
         <div class="title">缩进</div>
@@ -34,18 +34,18 @@
         </el-tab-pane>
       </el-tabs>
     </div>
-  </HsDialog>
+  </HDialog>
 </template>
 
 <script>
-import HsDialog from '@/components/common/dialog/Dialog.vue';
+import { HDialog } from '@huasen/ui';
 import VueJsonEditor from 'vue-json-editor-fix-cn';
 import { AF } from 'huasen-lib';
 export default {
   name: 'JsonToolPanel',
 
   components: {
-    HsDialog,
+    HDialog,
     VueJsonEditor,
   },
 

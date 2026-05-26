@@ -1,5 +1,4 @@
-# 安装 Node V16 精简版，不要升级版本，避免出现不兼容问题，例如：非对称加密算法异常。
-FROM node:16-alpine
+FROM node:18-alpine
 # 设置维护者信息 
 LABEL maintainer="huasen<184820911@qq.com>"
 # 防止中文打印信息显示乱码

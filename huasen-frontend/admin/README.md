@@ -4,5 +4,5 @@
 
 # 开发环境约束
 
-- node.js 16.x
+- node.js 18.x
 - vue.js 2.7.x

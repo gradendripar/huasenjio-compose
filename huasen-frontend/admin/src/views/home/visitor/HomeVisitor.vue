@@ -357,6 +357,10 @@ export default {
             axisPointer: {
               type: 'shadow',
             },
+            axisLabel: {
+              fontSize: 10,
+              rotate: 35,
+            },
           },
         ],
         series: [

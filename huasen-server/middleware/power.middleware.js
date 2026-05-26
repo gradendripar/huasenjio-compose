@@ -14,7 +14,7 @@ function checkManagePower(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'find',
         payloads: [{ id: proof.key, code: { $gte: 2 } }],
       },
@@ -35,7 +35,7 @@ function checkManageHighestPower(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'find',
         payloads: [{ id: proof.key, code: 3 }],
       },
@@ -56,7 +56,7 @@ function checkManageAccountUnique(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'User',
+        schemaName: 'user',
         methodName: 'find',
         payloads: [
           {

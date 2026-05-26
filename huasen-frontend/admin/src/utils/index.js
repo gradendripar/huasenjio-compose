@@ -5,10 +5,14 @@
  * @LastEditTime: 2022-12-11 11:00:44
  * @Description:
  */
-import { getServerApi } from './getServerApi.js';
-import { handleSize } from './handleSize.js';
+import { getServerApi, handleSize as formatAppSize } from '@huasen/shared';
+import CONSTANT from '@/constant/index.js';
 import { randomColor } from './randomColor';
 import { overrideKeys } from './lodash-lib.js';
+
+function handleSize(size) {
+  return formatAppSize(size, CONSTANT.appMinWidth);
+}
 
 export default {
   getServerApi,

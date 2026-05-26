@@ -93,7 +93,7 @@ export default {
     },
     handleCopy(row, column, cell, event) {
       tool.copyTextToClip(cell.innerText, () => {
-        alert('已拷贝单元格内容');
+        this.$message.success('已拷贝单元格内容');
       });
     },
   },

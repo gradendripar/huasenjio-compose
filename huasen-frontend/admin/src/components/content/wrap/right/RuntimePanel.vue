@@ -6,7 +6,15 @@
  * @Description: 
 -->
 <template>
-  <HsDialog title="执行动态脚本" :fullscreen="true" :visible="visible" :buttons="{ comfirm: '运 行', cancel: '关 闭' }" @comfirmDialog="comfirmDialog" @closeDialog="closeDialog" @close="close">
+  <HDialog
+    title="执行动态脚本"
+    :fullscreen="true"
+    :visible="visible"
+    :buttons="{ comfirm: '运 行', cancel: '关 闭' }"
+    @comfirmDialog="comfirmDialog"
+    @cancelDialog="closeDialog"
+    @close="close"
+  >
     <div class="runtime-panel">
       <el-form ref="form" :model="form" label-width="100px" label-position="top">
         <el-form-item label="脚本内容">
@@ -19,16 +27,16 @@
         </el-form-item>
       </el-form>
     </div>
-  </HsDialog>
+  </HDialog>
 </template>
 
 <script>
-import HsDialog from '@/components/common/dialog/Dialog.vue';
+import { HDialog } from '@huasen/ui';
 export default {
   name: 'RuntimePanel',
 
   components: {
-    HsDialog,
+    HDialog,
   },
 
   props: {

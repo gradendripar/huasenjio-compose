@@ -101,6 +101,24 @@
     "children": []
   },
   {
+    "path": "/ai-manage",
+    "name": "AiManage",
+    "menuCode": 0,
+    "component": "ai-manage/AiManage",
+    "keepAlive": true,
+    "title": "智能配置",
+    "children": []
+  },
+  {
+    "path": "/license-manage",
+    "name": "LicenseManage",
+    "menuCode": 0,
+    "component": "license-manage/LicenseManage",
+    "keepAlive": true,
+    "title": "授权管理",
+    "children": []
+  },
+  {
     "path": "/setting",
     "name": "Setting",
     "menuCode": 0,

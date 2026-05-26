@@ -11,6 +11,8 @@ export default {
   localUser: '_localUser',
   // 用户本地缓存的对称密钥
   localAESSecret: '_localAESSecret',
+  // 统一 Token 存储 key
+  TOKEN_KEY: 'huasen_token',
   // 公告本地缓存句柄
   appNotice: '_appNotice',
   // 当前订阅源本地缓存句柄

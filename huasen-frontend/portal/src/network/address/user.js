@@ -9,6 +9,7 @@
 import Mock from 'mockjs2';
 import { get, post } from '../request.js';
 
+const getCaptcha = get('/user/captcha');
 const login = post('/user/login');
 const register = post('/user/register');
 const updatePassword = post('/user/updatePassword');
@@ -17,6 +18,7 @@ const recovery = post('/user/recovery');
 const quit = post('/user/quit');
 
 export default {
+  getCaptcha,
   login,
   register,
   updatePassword,

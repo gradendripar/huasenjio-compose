@@ -162,7 +162,11 @@ export default {
         {
           label: '头像',
           key: 'headImg',
-          type: 'input',
+          type: 'imgURL',
+          typeConfig: {
+            uploadType: 'img',
+            accept: '.png,.jpg,.jpeg,.webp',
+          },
         },
         {
           label: '收录站点',
@@ -200,8 +204,8 @@ export default {
         code: 0,
         name: '',
         headImg: '',
-        records: '',
-        config: '',
+        records: '[]',
+        config: '{}',
         enabled: true,
       },
       pageNo: 1,
@@ -294,9 +298,6 @@ export default {
       }
     },
     cancel() {
-      if (this.$refs.dialogForm) {
-        this.$refs.dialogForm.close();
-      }
       this.show = false;
     },
   },

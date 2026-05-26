@@ -1,19 +1,20 @@
+# 项目配置
+.claude
+
+# system files
 .DS_Store
 
+# production files
 node_modules
-
-/huasen-log/
 /huasen-store/default/*
+/huasen-store/article/*
 /huasen-mongo/volume/*
 /huasen-redis/data/*
 /huasen-nginx/log/*
 /huasen-server/log/*
-/huasen-jenkins/*
-/huasen-jenkins-cache/*
-
-# local env files
-.env.local
-.env.*.local
+/huasen-server/public/webapp/portal/sitemap.xml
+/huasen-server/public/webapp/portal/robots.txt
+/huasen-log/*
 
 # Log files
 npm-debug.log*

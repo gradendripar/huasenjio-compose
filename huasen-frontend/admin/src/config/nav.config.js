@@ -22,11 +22,10 @@ export default [
     path: '/article-manage',
     iconClass: 'iconfont icon-md-stats',
   },
-
   {
     name: '订阅源管理',
     path: '/journal-manage',
-    iconClass: 'iconfont icon-a-smartrobot-fill',
+    iconClass: 'iconfont icon-chubufenlei',
   },
   {
     name: '栏目管理',
@@ -54,8 +53,18 @@ export default [
     iconClass: 'iconfont icon-a-documentationupload-line',
   },
   {
+    name: '智能配置',
+    path: '/ai-manage',
+    iconClass: 'iconfont icon-aiapp',
+  },
+  {
     name: '系统配置',
     path: '/setting',
     iconClass: 'iconfont icon-xitongpeizhi',
+  },
+  {
+    name: '授权管理',
+    path: '/license-manage',
+    iconClass: 'iconfont icon-badge-line',
   },
 ];

@@ -10,7 +10,7 @@ export default defineConfig({
       formats: ["es", "cjs"],
     },
     rollupOptions: {
-      external: ["crypto", "constants", "core-js"],
+      external: ["crypto", "constants", "core-js", "axios"],
     },
     // 添加目标环境配置
     target: "es2015",

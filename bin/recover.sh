@@ -6,9 +6,8 @@ set -e
 sh_path=$(cd $(dirname "$0") && pwd)
 # 项目根目录的绝对路径
 project_path=$sh_path"/.." 
-# docker 镜像文件
+# docker 镜像配置文件及镜像源
 daemon_file="/etc/docker/daemon.json"
-# docker 镜像源
 mirror1="https://docker.m.daocloud.io"
 mirror2="https://dockerproxy.com"
 mirror3="https://registry.docker-cn.com"
@@ -167,8 +166,13 @@ install_docker_compose() {
 start_containers() {
     echo '[Huasen Log]：正在启动容器...'
     cd "$project_path"
-    docker-compose down
-    docker-compose up -d
+
+    # 引入环境配置函数库
+    source "$sh_path/env-lib.sh"
+    DOCKER_COMPOSE=$(get_docker_compose_cmd)
+
+    $DOCKER_COMPOSE down
+    $DOCKER_COMPOSE up -d
     echo '[Huasen log]：启动容器成功...'
 }
 
@@ -191,4 +195,3 @@ main() {
 }
 
 main
-

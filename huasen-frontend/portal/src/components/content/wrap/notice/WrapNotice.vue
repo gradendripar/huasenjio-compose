@@ -1,5 +1,5 @@
 <template>
-  <HsDialog
+  <HDialog
     :title="'网站传声筒'"
     :visible.sync="showNotice"
     :width="width"
@@ -10,22 +10,22 @@
     v-bind="$attrs"
     v-on="$listeners"
     @comfirmDialog="recordNotice"
-    @closeDialog="readNotice"
+    @cancelDialog="readNotice"
     @close="close"
   >
-    <Markdown :value="noticeContent"> </Markdown>
-  </HsDialog>
+    <Markdown :value="noticeContent" :html="true" theme="default"> </Markdown>
+  </HDialog>
 </template>
 <script>
 import { mapState, mapMutations, mapActions } from 'vuex';
-import HsDialog from '@/components/content/dialog/Dialog.vue';
+import { HDialog } from '@huasen/ui';
 import Markdown from '@/components/common/markdown/Markdown.vue';
 import ResizeHook from '@/mixins/resize-hook.js';
 export default {
   name: 'WrapNotice',
   mixins: [ResizeHook],
   components: {
-    HsDialog,
+    HDialog,
     Markdown,
   },
   data() {

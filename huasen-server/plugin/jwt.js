@@ -74,25 +74,25 @@ class Jwter {
 
   /**
    * 获取所有活跃token
-   * @returns 
+   * @returns
    */
   async getActiveToken() {
     try {
-      let onlines = []
-      const keys = await getRedisKeys(`${POOL_TOKEN}_*`)
+      let onlines = [];
+      const keys = await getRedisKeys(`${POOL_TOKEN}_*`);
       for (let i = 0; i < keys.length; i++) {
         const key = keys[i];
-        const token = await getRedisItem(key)
-        const ttl = await getRedisKeyTTL(key)
+        const token = await getRedisItem(key);
+        const ttl = await getRedisKeyTTL(key);
         onlines.push({
           id: this.getKey(key),
           token: token,
-          ttl
-        })
+          ttl,
+        });
       }
-      return onlines
+      return onlines;
     } catch (err) {
-      return
+      return;
     }
   }
 
@@ -106,15 +106,14 @@ class Jwter {
       const redisKey = this.getTokenRedisKey(key);
       const token = await getRedisItem(redisKey);
       if (token) {
-        await delRedisItem(redisKey)
-        return this.handleMsg('finish', null)
+        await delRedisItem(redisKey);
+        return this.handleMsg('finish', null);
       }
-      return this.handleMsg('notfound', null)
+      return this.handleMsg('notfound', null);
     } catch (err) {
-      this.handleMsg('error', null)
+      this.handleMsg('error', null);
     }
   }
-
 
   /**
    * 统一处理通知
@@ -129,16 +128,16 @@ class Jwter {
         notify.msg = '身份校验通过';
         break;
       case 'timeout':
-        notify.msg = '身份已过期，请重新登录！';
+        notify.msg = '请重新登录';
         break;
       case 'illegal':
-        notify.msg = '身份非法，劝您善良！';
+        notify.msg = '未登录或权限不足';
         break;
       case 'lack':
-        notify.msg = '身份参数缺失，请您登录账号！';
+        notify.msg = '请您登录账号';
         break;
       case 'notfound':
-        notify.msg = '身份未知，劝您善良！';
+        notify.msg = '身份异常';
         break;
       case 'finish':
         notify.msg = '操作完成';
@@ -155,7 +154,7 @@ class Jwter {
   /**
    * 获取jwt存储于redis的key值
    * @param {string} key - 存入redis的键，此处为用户、管理员账号，即：邮箱地址
-   * @returns 
+   * @returns
    */
   getTokenRedisKey(key) {
     return `${POOL_TOKEN}_${key}`;
@@ -164,10 +163,10 @@ class Jwter {
   /**
    * 获取key
    * @param {string} redisKey - redis的key值
-   * @returns 
+   * @returns
    */
   getKey(redisKey) {
-    return redisKey.split(`${POOL_TOKEN}_`)[1]
+    return redisKey.split(`${POOL_TOKEN}_`)[1];
   }
 }
 

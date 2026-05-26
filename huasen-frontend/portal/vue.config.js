@@ -16,7 +16,7 @@ function resolve(dir) {
 module.exports = {
   outputDir: '../../huasen-server/public/webapp/portal', // 输出路径
   publicPath: './',
-  transpileDependencies: ['highlight.js'],
+  transpileDependencies: ['@huasen/ui', '@huasen/shared', 'highlight.js'],
   productionSourceMap: false,
   runtimeCompiler: true, // 运行时编译
   configureWebpack: config => {
@@ -119,6 +119,16 @@ module.exports = {
   },
   //  配置别名
   chainWebpack: config => {
+    config.module
+      .rule('eslint')
+      .exclude
+        .add(path.resolve(__dirname, '../packages'))
+        .end()
+      .use('eslint-loader')
+      .tap(options => {
+        options.ignorePath = path.resolve(__dirname, '../.eslintignore');
+        return options;
+      });
     // 命名别名
     config.resolve.alias
       .set('@', resolve('src'))
@@ -136,6 +146,11 @@ module.exports = {
   },
   css: {
     loaderOptions: {
+      postcss: {
+        config: {
+          path: path.resolve(__dirname, 'postcss.config.js'),
+        },
+      },
       // 样式文件通常需要style-loader(0)，css-loader(1)，postcss-loader(2)，sass-loader(3)处理
       css: {
         // css文件中通过@import引入前，需要先经过第几位loader开始处理，此处3为了支持css中引入scss文件
@@ -156,9 +171,12 @@ module.exports = {
     proxy: {
       '^/dev': {
         target: 'http://localhost:3000',
-        pathRewrite: { '^/dev': '' },
+        pathRewrite: { '^/dev': '' }, // 重写路径，去掉/dev前缀
       },
       '^/huasen-store': {
+        target: 'http://localhost:3000',
+      },
+      '^/seo': {
         target: 'http://localhost:3000',
       },
     },

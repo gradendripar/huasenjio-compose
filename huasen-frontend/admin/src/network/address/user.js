@@ -8,6 +8,7 @@
 const Mock = require('mockjs2');
 import { get, post } from '../request.js';
 
+const getCaptcha = get('/user/captcha');
 const login = post('/user/manage/login');
 const exist = post('/user/manage/exist');
 const init = post('/user/manage/init');
@@ -18,4 +19,4 @@ const removeUser = post('/user/remove');
 const updateUser = post('/user/update');
 const findUserByPage = post('/user/findByPage');
 
-export { login, exist, init, findUserByPage, addUser, removeUser, updateUser, quit };
+export { getCaptcha, login, exist, init, findUserByPage, addUser, removeUser, updateUser, quit };

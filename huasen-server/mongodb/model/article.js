@@ -46,10 +46,10 @@ let ArticleSchema = new mongoose.Schema(
     tag: {
       type: String,
       validate: {
-        validator: function (desc) {
-          if (!desc) return true;
+        validator: function (tag) {
+          if (!tag) return true;
           try {
-            let temp = desc.split(/[\/|\\]/);
+            let temp = tag.split(/[\/|\\]/);
             return temp.every(item => {
               return item !== '';
             });
@@ -93,6 +93,6 @@ let ArticleSchema = new mongoose.Schema(
   },
 );
 
-const Article = mongoose.model('articles', ArticleSchema);
+const Article = mongoose.model('article', ArticleSchema);
 
 module.exports = Article;

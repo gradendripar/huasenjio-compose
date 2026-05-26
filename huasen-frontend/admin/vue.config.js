@@ -15,9 +15,10 @@ module.exports = {
   outputDir: '../../huasen-server/public/webapp/admin', // 输出路径
   publicPath: './',
   productionSourceMap: false,
+  transpileDependencies: ['@huasen/ui', '@huasen/shared'],
   runtimeCompiler: true, // 运行时编译
   configureWebpack: config => {
-    config.devtool = process.env.NODE_ENV === 'development' ? 'cheap-module-eval-source-map' : 'nosources-source-map'
+    config.devtool = process.env.NODE_ENV === 'development' ? 'cheap-module-eval-source-map' : 'nosources-source-map';
     config.resolve.modules = ['node_modules', './src/assets/icon'];
     const Plugins = [];
     // 生产环境配置打包文件大小
@@ -81,6 +82,16 @@ module.exports = {
   },
   //  配置别名
   chainWebpack: config => {
+    config.module
+      .rule('eslint')
+      .exclude
+        .add(path.resolve(__dirname, '../packages'))
+        .end()
+      .use('eslint-loader')
+      .tap(options => {
+        options.ignorePath = path.resolve(__dirname, '../.eslintignore');
+        return options;
+      });
     config.resolve.alias
       .set('@', resolve('src'))
       .set('assets', resolve('src/assets'))
@@ -97,6 +108,11 @@ module.exports = {
   },
   css: {
     loaderOptions: {
+      postcss: {
+        config: {
+          path: path.resolve(__dirname, 'postcss.config.js'),
+        },
+      },
       // 样式文件通常需要style-loader(0)，css-loader(1)，postcss-loader(2)，sass-loader(3)处理
       css: {
         // css文件中通过@import引入前，需要先经过第几位loader开始处理，此处3为了支持css中引入scss文件
@@ -117,9 +133,12 @@ module.exports = {
     proxy: {
       '^/dev': {
         target: 'http://localhost:3000',
-        pathRewrite: { '^/dev': '' },
+        pathRewrite: { '^/dev': '' }, // 重写路径，去掉/dev前缀
       },
       '^/huasen-store': {
+        target: 'http://localhost:3000',
+      },
+      '^/seo': {
         target: 'http://localhost:3000',
       },
     },

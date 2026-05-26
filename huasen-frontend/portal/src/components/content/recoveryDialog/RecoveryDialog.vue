@@ -1,5 +1,5 @@
 <template>
-  <HsDialog class="recovery-dialog" :title="'数据管理面板'" :width="width" :height="height" :maxHeight="height" :close-on-click-modal="false" v-bind="$attrs" v-on="$listeners">
+  <HDialog class="recovery-dialog" :title="'数据管理面板'" :width="width" :height="height" :maxHeight="height" :close-on-click-modal="false" v-bind="$attrs" v-on="$listeners">
     <el-tabs class="recovery-dialog__tabs" type="border-card" v-model="active">
       <el-tab-pane name="backup" label="数据备份">
         <el-button icon="el-icon-document-copy" type="info" size="mini" @click="handleCopy">拷贝离线数据</el-button>
@@ -29,16 +29,16 @@
         ></el-input>
       </div>
     </el-tabs>
-  </HsDialog>
+  </HDialog>
 </template>
 <script>
 import { mapState, mapGetters, mapMutations, mapActions } from 'vuex';
 import { tool } from 'huasen-lib';
-import HsDialog from '@/components/content/dialog/Dialog.vue';
+import { HDialog } from '@huasen/ui';
 export default {
   name: 'RecoveryDialog',
   components: {
-    HsDialog,
+    HDialog,
   },
   data() {
     return {
@@ -102,7 +102,7 @@ export default {
      */
     handleCopy() {
       tool.copyTextToClip(this.displayData, () => {
-        alert('本地数据已复制到剪贴板');
+        this.$message.success('本地数据已复制到剪贴板');
       });
     },
 

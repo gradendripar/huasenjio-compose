@@ -27,6 +27,7 @@
       v-if="show"
       ref="dialogForm"
       width="460"
+      height="200"
       :title="mode == 'add' ? '添加黑名单' : '编辑黑名单'"
       :visible.sync="show"
       :mode="mode"
@@ -158,9 +159,6 @@ export default {
       }
     },
     cancel() {
-      if (this.$refs.dialogForm) {
-        this.$refs.dialogForm.close();
-      }
       this.show = false;
     },
   },

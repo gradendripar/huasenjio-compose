@@ -27,6 +27,7 @@
       v-if="show"
       ref="dialogForm"
       width="460"
+      height="380"
       :title="mode == 'add' ? '添加订阅源' : '编辑订阅源'"
       :visible.sync="show"
       :formMap="formMap"
@@ -254,9 +255,6 @@ export default {
     },
 
     cancel() {
-      if (this.$refs.dialogForm) {
-        this.$refs.dialogForm.close();
-      }
       this.show = false;
     },
 

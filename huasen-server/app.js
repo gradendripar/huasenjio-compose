@@ -13,6 +13,7 @@ const app = express();
 
 // 启动端口
 const { SITE, PORT_SERVER } = require('./config.js');
+const { mountSEORoutes } = require('./plugin/seo/index.js');
 
 // 引入程序
 require('./plugin/log.js');
@@ -23,7 +24,7 @@ require('./plugin/ws/ws.js');
 require('./global/index.js');
 
 // 全局中间件
-const { handleBlackList, handleRequestError, handleRequest, handleRequestParams, handleDetectCrawler } = require('./middleware/common.middleware.js');
+const { handleBlackList, handleRequestError, handleRequest, handleRequestParams } = require('./middleware/common.middleware.js');
 
 // 解决cors跨域问题
 const cors = require('cors'); // cors跨域插件
@@ -34,16 +35,12 @@ const bodyparser = require('body-parser');
 app.use(bodyparser.json({ limit: '50mb' }));
 app.use(bodyparser.urlencoded({ limit: '50mb', extended: false }));
 
+// SEO路由
+mountSEORoutes(app);
+
 // 配置静态资源目录
-app.use('/public', handleDetectCrawler, async (req, res, next) => {
-  const seoFilePath = path.resolve(__dirname, './public/webapp/portal/index-seo.html');
-  if (req.isCrawler && fs.existsSync(seoFilePath)) {
-    res.sendFile(seoFilePath);
-  } else {
-    next();
-  }
-}, express.static(path.join(__dirname, './public')));
-app.use('/huasen-store', express.static(path.join(__dirname, '../huasen-store')));
+app.use('/public', express.static(path.join(__dirname, './public')), (req, res) => res.status(404).end());
+app.use('/huasen-store', express.static(path.join(__dirname, '../huasen-store')), (req, res) => res.status(404).end());
 
 // 全局拦截
 app.use(handleRequest, handleBlackList, handleRequestParams);
@@ -61,6 +58,10 @@ app.use('/journal', require('./router/journal.router.js'));
 app.use('/weather', require('./router/weather.router.js'));
 app.use('/app', require('./router/app.router.js'));
 app.use('/statistics', require('./router/statistics.router.js'));
+app.use('/tag', require('./router/tag.router.js'));
+app.use('/pin', require('./router/pin.router.js'));
+app.use('/ai', require('./router/ai.router.js'));
+app.use('/license', require('./router/license.router.js'));
 
 // 404页面重定向
 app.get('*', function (req, res) {
@@ -71,8 +72,18 @@ app.get('*', function (req, res) {
 app.use(handleRequestError);
 
 // 启动服务
-app.listen(PORT_SERVER, () => {
+app.listen(PORT_SERVER, async () => {
   console.log(`[Huasen Log]：express 服务端口为${PORT_SERVER}`);
+  const { shouldSyncOnBoot, syncLicenseWithOfficial } = require('./controller/license.controller.js');
+  try {
+    if (await shouldSyncOnBoot()) {
+      syncLicenseWithOfficial({ preserveAbilityUserConfig: true })
+        .then(result => console.log('[Huasen License] 启动同步完成：', result))
+        .catch(err => console.warn('[Huasen License] 启动同步失败：', err.message));
+    }
+  } catch (err) {
+    console.warn('[Huasen License] 启动同步检查失败：', err.message);
+  }
 });
 
 // 全局未捕获的异常

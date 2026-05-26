@@ -1,35 +1,38 @@
 // 构建px的尺寸
 /**
- * 注入精细化变量 <= 200
+ * 注入精细化变量 <= 400
  * top-px-98
  * -top-px-98
  * p-px-50
  * m-px-50
  * w-px-50
  * h-px-50
- * @returns Array
+ * @param {Number} range - 生成范围，默认400
+ * @param {String} tag   - 正数或负数
+ * @returns Object
  */
-function useFullPx(range = 200) {
+function createPX(range = 400, tag) {
   let fullPxs = {};
-  let negativeFullSize = {};
   for (let index = 0; index <= range; index++) {
     if (index % 2 === 0 || index % 5 === 0) {
-      fullPxs[`px-${index}`] = `${index}px`;
-      negativeFullSize[`-px-${index}`] = `-${index}px`;
+      if (tag === 'negative') {
+        fullPxs[`-px-${index}`] = `-${index}px`;
+      } else {
+        fullPxs[`px-${index}`] = `${index}px`;
+      }
     }
   }
-  return { fullPxs, negativeFullSize };
+  return fullPxs;
 }
-let sizePxs = useFullPx().fullPxs;
-let negativeSizePxs = useFullPx().negativeFullSize;
+let sizePxs = createPX(400, 'positive');
+let negativeSizePxs = createPX(200, 'negative');
 
 module.exports = {
   future: {
     // removeDeprecatedGapUtilities: true,
     // purgeLayersByDefault: true,
   },
-  purge: ['./src/**/*.html', './src/**/*.vue', './src/**/*.jsx'], // 优化性能，html、vue、jsx中去除没有用到的class样式
-  target: 'relaxed',
+  purge: ['./src/**/*.html', './src/**/*.vue', './src/**/*.js'], // 优化性能，html、vue、js中去除没有用到的class样式
   prefix: '',
   important: false,
   separator: ':',
@@ -217,13 +220,13 @@ module.exports = {
     },
     borderColor: theme => ({
       ...theme('colors'),
-      default: theme('colors.gray.300', 'currentColor'),
+      DEFAULT: theme('colors.gray.300', 'currentColor'),
     }),
     borderOpacity: theme => theme('opacity'),
     borderRadius: {
       none: '0',
       sm: '0.125rem',
-      default: '0.25rem',
+      DEFAULT: '0.25rem',
       md: '0.375rem',
       lg: '0.5rem',
       xl: '0.75rem',
@@ -232,7 +235,7 @@ module.exports = {
       full: '9999px',
     },
     borderWidth: {
-      default: '1px',
+      DEFAULT: '1px',
       '0': '0',
       '2': '2px',
       '4': '4px',
@@ -241,7 +244,7 @@ module.exports = {
     boxShadow: {
       xs: '0 0 0 1px rgba(0, 0, 0, 0.05)',
       sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-      default: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+      DEFAULT: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
       md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
       lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
       xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
@@ -274,11 +277,11 @@ module.exports = {
     },
     flexGrow: {
       '0': '0',
-      default: '1',
+      DEFAULT: '1',
     },
     flexShrink: {
       '0': '0',
-      default: '1',
+      DEFAULT: '1',
     },
     fontFamily: {
       sans: [
@@ -689,7 +692,7 @@ module.exports = {
     transitionProperty: {
       none: 'none',
       all: 'all',
-      default: 'background-color, border-color, color, fill, stroke, opacity, box-shadow, transform',
+      DEFAULT: 'background-color, border-color, color, fill, stroke, opacity, box-shadow, transform',
       colors: 'background-color, border-color, color, fill, stroke',
       opacity: 'opacity',
       shadow: 'box-shadow',

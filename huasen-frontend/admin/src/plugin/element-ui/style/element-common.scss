@@ -1,3 +1,8 @@
+.el-textarea__inner {
+  resize: none !important;
+  padding-right: 4px;
+}
+
 // 去除下拉菜单弹出层的小箭头
 .el-popper[x-placement^='bottom-end'] {
   .popper__arrow {

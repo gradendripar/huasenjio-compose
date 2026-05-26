@@ -10,6 +10,21 @@ const _ = require('lodash');
 const { formatError } = require('../utils/error-handle.js');
 const { formatResponseData, responseData } = require('../utils/response-handle');
 const { epWorking, createEpWorking } = require('../service/index.js');
+const { generateInstanceFingerprint } = require('../utils/license/fingerprint.js');
+
+let isOfficial = false;
+try {
+  require('../controller/closed-source/license-center.controller.js');
+  isOfficial = true;
+} catch (e) {}
+
+// 生成实例指纹（启动时执行一次）
+let instanceFingerprint = '';
+try {
+  instanceFingerprint = generateInstanceFingerprint();
+} catch (err) {
+  console.error('[Huasen Log]：实例指纹生成失败（Docker Socket / Docker CLI 不可用）:', err.message);
+}
 
 // 挂载全局
 global.huasen = {
@@ -21,6 +36,10 @@ global.huasen = {
   responseData,
   // 任务代理
   createEpWorking,
+  // 是否为官方闭源版
+  isOfficial,
+  // 实例指纹（启动时缓存）
+  instanceFingerprint,
 };
 
 // 记录状态
@@ -43,13 +62,13 @@ global.hsDic = {
    * @param {*} value - 值
    */
   getDicLabelByValue(dic, value) {
-    let _label
+    let _label;
     (this[dic] || []).forEach(item => {
       if (item.value === value) {
         _label = item.label;
       }
     });
-    return _label
+    return _label;
   },
 
   /**
@@ -58,13 +77,13 @@ global.hsDic = {
    * @param {String} label - 键
    */
   getDicValueByLabel(dic, label) {
-    let _value
+    let _value;
     (this[dic] || []).forEach(item => {
       if (item.label === label) {
         _value = item.value;
       }
     });
-    return _value
+    return _value;
   },
 
   code: [
@@ -95,22 +114,4 @@ global.hsDic = {
       value: false,
     },
   ],
-  pin: [
-    {
-      label: '热',
-      value: 1,
-    },
-    {
-      label: '墙',
-      value: 2,
-    },
-    {
-      label: '优',
-      value: 3,
-    },
-    {
-      label: '免',
-      value: 4,
-    },
-  ],
-}
+};

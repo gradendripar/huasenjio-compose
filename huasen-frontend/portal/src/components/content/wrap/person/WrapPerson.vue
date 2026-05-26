@@ -20,7 +20,7 @@
       </header>
       <main>
         <ul>
-          <li>
+          <!-- <li>
             <div class="left">
               <div class="title">自动备份</div>
               <div class="detail">数据更新之后自动备份（开发中）</div>
@@ -28,7 +28,7 @@
             <div class="right">
               <el-switch v-model="autoBackup" active-text="开启" inactive-text="关闭"> </el-switch>
             </div>
-          </li>
+          </li> -->
           <li>
             <div class="left">
               <div class="title">注销账号</div>
@@ -168,6 +168,7 @@ export default {
             font-size: 14px;
           }
           .detail {
+            margin-top: 4px;
             font-size: 10px;
             color: var(--gray-400);
           }

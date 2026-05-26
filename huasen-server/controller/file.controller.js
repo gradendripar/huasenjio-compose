@@ -29,16 +29,26 @@ const uploadConfigMap = {
   },
 };
 
+function getStoreFileList() {
+  const storePath = path.resolve(process.cwd(), '../huasen-store');
+  let files = readDirectory(storePath);
+  files = files.filter(filePath => {
+    const relativePath = path.relative(storePath, filePath);
+    if (!relativePath || relativePath.startsWith('..')) return false;
+    const pathParts = relativePath.split(path.sep);
+    if (['webapp', 'temp'].includes(pathParts[0])) return false;
+
+    const fileName = pathParts.slice(-1).join('');
+    const ext = fileName.split('.').slice(-1).join('');
+    return fileType.includes('.' + ext.toLowerCase());
+  });
+  return files;
+}
+
 function findAll(req, res, next) {
-  let files = readDirectory(path.resolve(process.cwd(), '../huasen-store'));
-  files = files.filter(path => !path.includes('/huasen-store/webapp'))
+  let files = getStoreFileList();
   files = files.map(item => {
     return item.slice(item.indexOf('huasen-store'));
-  });
-  files = files.filter(filePath => {
-    let fileName = filePath.split(/\/|\\/).slice(-1).join('');
-    let ext = fileName.split('.').slice(-1).join('');
-    return fileType.includes('.' + ext.toLowerCase());
   });
   global.huasen.responseData(res, files, 'SUCCESS', '查询文件');
 }
@@ -74,14 +84,36 @@ async function remove(req, res, next) {
   global.huasen.responseData(res, {}, 'SUCCESS', '删除文件');
 }
 
-// 压缩
-async function conpresStoreFile(req, res, next) {
-  let filePath = path.resolve(process.cwd(), '../huasen-store');
-  let outputPath = path.resolve(process.cwd(), `../huasen-store/temp/store-${new Date().getTime()}.zip`);
-  compressing.zip.compressDir(filePath, outputPath).then(async result => {
-    global.huasen.responseData(res, { filePath: outputPath }, 'SUCCESS', '已压缩');
-    await unlinkFile(outputPath);
-  });
+function downloadStore(req, res, next) {
+  try {
+    const storePath = path.resolve(process.cwd(), '../huasen-store');
+    const files = getStoreFileList();
+    const zipStream = new compressing.zip.Stream();
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="huasen-store-${Date.now()}.zip"`);
+
+    zipStream.on('error', err => {
+      if (res.headersSent) {
+        res.destroy(err);
+      } else {
+        next(err);
+      }
+    });
+    zipStream.pipe(res);
+
+    if (!files.length) {
+      zipStream.addEntry(Buffer.from('huasen-store is empty'), { relativePath: 'README.txt' });
+      return;
+    }
+
+    files.forEach(filePath => {
+      const relativePath = path.relative(storePath, filePath).split(path.sep).join('/');
+      zipStream.addEntry(filePath, { relativePath });
+    });
+  } catch (err) {
+    next(err);
+  }
 }
 
 // 解压
@@ -136,5 +168,6 @@ module.exports = {
   findAll,
   findAllIcon,
   remove,
+  downloadStore,
   uploadFileToStore
 };

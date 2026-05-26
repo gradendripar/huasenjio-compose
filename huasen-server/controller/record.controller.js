@@ -10,7 +10,7 @@ function add(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Record',
+        schemaName: 'record',
         methodName: 'insertMany',
         payloads: [req.huasenParams],
       },
@@ -35,7 +35,7 @@ function findByPage(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Record',
+        schemaName: 'record',
         methodName: 'findByPage',
         payloads: [
           {
@@ -68,7 +68,7 @@ function remove(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Record',
+        schemaName: 'record',
         methodName: 'deleteOne',
         payloads: [
           {
@@ -88,7 +88,7 @@ function removeMany(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Record',
+        schemaName: 'record',
         methodName: 'deleteMany',
         payloads: [{ _id: { $in: _ids } }],
       },
@@ -104,7 +104,7 @@ function copy(req, res, next) {
   req.epWorking(
     [
       {
-        schemaName: 'Record',
+        schemaName: 'record',
         methodName: 'find',
         payloads: [{ _id }, { _id: 0, __v: 0 }],
       },

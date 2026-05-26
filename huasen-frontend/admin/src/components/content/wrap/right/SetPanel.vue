@@ -6,17 +6,25 @@
  * @Description: 
 -->
 <template>
-  <HsDialog title="配置文件" :fullscreen="true" :visible="visible" :buttons="{ comfirm: '确 定', cancel: '取 消' }" @comfirmDialog="comfirmDialog" @closeDialog="closeDialog" @close="close">
+  <HDialog
+    title="配置文件"
+    :fullscreen="true"
+    :visible="visible"
+    :buttons="{ comfirm: '确 定', cancel: '取 消' }"
+    @comfirmDialog="comfirmDialog"
+    @cancelDialog="closeDialog"
+    @close="close"
+  >
     <div class="set-panel">
       <div class="result">
         <el-input type="textarea" autosize v-model="systemConfig"></el-input>
       </div>
     </div>
-  </HsDialog>
+  </HDialog>
 </template>
 
 <script>
-import HsDialog from '@/components/common/dialog/Dialog.vue';
+import { HDialog } from '@huasen/ui';
 import { Validator } from 'huasen-lib';
 const validator = new Validator();
 const checkParamsByRules = validator.verify.bind(validator);
@@ -25,7 +33,7 @@ export default {
   name: 'SetPanel',
 
   components: {
-    HsDialog,
+    HDialog,
   },
 
   props: {

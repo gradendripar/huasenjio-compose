@@ -7,7 +7,7 @@
 -->
 
 <template>
-  <HsDialog class="form-dialog" :title="title" v-bind="$attrs" v-on="$listeners" @comfirmDialog="comfirmDialog" @closeDialog="closeDialog" @close="closeDialog">
+  <HDialog class="form-dialog" :title="title" v-bind="$attrs" v-on="$listeners" @comfirmDialog="comfirmDialog" @cancelDialog="closeDialog" @close="closeDialog">
     <el-form ref="form" class="form-group" :model="formData" :rules="formRule" label-position="top">
       <el-form-item v-for="(item, index) in formMap" :key="index" :label="item.label" :prop="item.key">
         <!-- 输入框 -->
@@ -24,14 +24,14 @@
         <!-- 日期 -->
       </el-form-item>
     </el-form>
-  </HsDialog>
+  </HDialog>
 </template>
 <script>
-import HsDialog from '@/components/content/dialog/Dialog.vue';
+import { HDialog } from '@huasen/ui';
 export default {
   name: 'FormDialog',
 
-  components: { HsDialog },
+  components: { HDialog },
 
   props: {
     title: {
