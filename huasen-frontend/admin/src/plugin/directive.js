@@ -13,12 +13,13 @@ import unloadImg from '@/assets/img/error/image-error.png';
 import loadImg from '@/assets/img/loading/3.gif';
 
 import hljs from 'highlight.js';
-import 'highlight.js/styles/default.css';
+import 'highlight.js/styles/github.css';
 
 // markdown代码高亮
 Vue.directive('highlight', function (el) {
   let blocks = el.querySelectorAll('pre code');
   blocks.forEach(block => {
+    if (!/\blanguage-/.test(block.className || '')) return;
     hljs.highlightBlock(block);
   });
 });

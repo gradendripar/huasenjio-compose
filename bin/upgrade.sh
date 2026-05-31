@@ -7,13 +7,12 @@ sh_path=$(cd $(dirname "$0") && pwd)
 projectPath=$sh_path"/.."
 # 引入环境配置函数库
 source "$sh_path/env-lib.sh"
-# 远程仓库名称
-gitStorageName="huasenjio-compose"
 # 远程仓库地址
-gitStoragePath="https://gitee.com/HuaSenJioJio/huasenjio-compose.git"
+gitStoragePath="$DEFAULT_GIT_REPO"
+# 远程仓库名称
+gitStorageName="$(get_git_repo_name "$gitStoragePath")"
 # 缓存目录
 tempPath=$sh_path"/../../huasen-temp"
-
 
 # 系统类型变量
 OS_TYPE=""
@@ -79,6 +78,12 @@ install_dependencies() {
         echo "[Huasen Log]：正在安装 Rsync..."
         $PM_INSTALL rsync
     fi
+}
+
+configure_git_repo() {
+    select_git_repo "$projectPath/.env" "gitStoragePath" 30
+    gitStorageName="$(get_git_repo_name "$gitStoragePath")"
+    log_info "源码缓存目录名: $gitStorageName"
 }
 
 prepare_env_config() {
@@ -205,7 +210,7 @@ pull_latest_code() {
     if [ "$PULL_CODE" = true ]; then
         echo '[Huasen Log]：正在拉取最新源码...'
         cd $tempPath
-        git clone $gitStoragePath
+        git clone "$gitStoragePath" "$gitStorageName"
     else
         echo '[Huasen Log]：已跳过拉取源码'
     fi
@@ -265,6 +270,7 @@ restart_program() {
 
 main() {
     install_dependencies
+    configure_git_repo
     run_backup_script
     init_cache_dir
     prepare_env_config

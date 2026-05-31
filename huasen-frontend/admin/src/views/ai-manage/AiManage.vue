@@ -11,6 +11,7 @@
       <el-tab-pane label="供应商" name="provider"><Provider ref="providerRef"></Provider></el-tab-pane>
       <el-tab-pane label="模型预设" name="preset"><AiPreset ref="presetRef"></AiPreset></el-tab-pane>
       <el-tab-pane label="AI应用" name="app"><AiApp ref="appRef"></AiApp></el-tab-pane>
+      <el-tab-pane label="知识包" name="knowledgePack"><KnowledgePack ref="knowledgePackRef"></KnowledgePack></el-tab-pane>
       <el-tab-pane label="对话记录" name="conversation"><Conversation ref="conversationRef"></Conversation></el-tab-pane>
       <el-tab-pane v-if="showAiPluginTabs" label="AI插件能力配置" name="ability"><Ability ref="abilityRef"></Ability></el-tab-pane>
       <el-tab-pane v-if="showPluginSourceTab" label="AI插件源码" name="pluginSource"><PluginSourceTab ref="pluginSourceRef"></PluginSourceTab></el-tab-pane>
@@ -22,6 +23,7 @@
 import Provider from './provider/Provider.vue';
 import AiApp from './app/AiApp.vue';
 import AiPreset from './preset/AiPreset.vue';
+import KnowledgePack from './knowledge-pack/KnowledgePack.vue';
 import Ability from './ability/Ability.vue';
 import Conversation from './conversation/Conversation.vue';
 
@@ -54,6 +56,7 @@ export default {
     Provider,
     AiApp,
     AiPreset,
+    KnowledgePack,
     Ability,
     Conversation,
     PluginSourceTab: PluginSourceTab || null,
@@ -87,6 +90,7 @@ export default {
         provider: 'providerRef',
         app: 'appRef',
         preset: 'presetRef',
+        knowledgePack: 'knowledgePackRef',
         conversation: 'conversationRef',
         ability: 'abilityRef',
         pluginSource: 'pluginSourceRef',

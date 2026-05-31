@@ -14,6 +14,10 @@ let AIConversationSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    knowledgePackIds: {
+      type: [String],
+      default: [],
+    },
     title: {
       type: String,
       default: '新会话',

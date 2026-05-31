@@ -80,6 +80,9 @@ log_separator() {
 # 环境配置管理函数
 # ────────────────────────────────────────────────────────────────────────────
 
+DEFAULT_GIT_REPO="https://github.com/huasenjio/huasenjio-compose.git"
+DEFAULT_GITEE_REPO="https://gitee.com/huasenjio/huasenjio-compose.git"
+
 # 加载 .env 文件
 # 参数: $1 - .env 文件路径（默认为当前目录的 .env）
 # 返回: 0-成功, 1-文件不存在
@@ -96,6 +99,93 @@ load_env() {
         log_warn "环境配置文件不存在: $env_file"
         return 1
     fi
+}
+
+# 选择源码仓库地址
+# 参数: $1 - .env 文件路径, $2 - 接收仓库地址的变量名, $3 - 超时秒数（默认30）
+select_git_repo() {
+    local env_file="$1"
+    local target_var="$2"
+    local timeout="${3:-30}"
+    local git_repo="$DEFAULT_GIT_REPO"
+    local gitee_repo="$DEFAULT_GITEE_REPO"
+    local env_git_repo=""
+    local env_gitee_repo=""
+    local choice=""
+    local selected_name="git"
+    local selected_repo=""
+
+    if [ -n "$env_file" ] && [ -f "$env_file" ]; then
+        env_git_repo="$(sed -n 's/^GIT_REPO=//p' "$env_file" | head -n 1)"
+        env_gitee_repo="$(sed -n 's/^GITEE_REPO=//p' "$env_file" | head -n 1)"
+
+        if [ -n "$env_git_repo" ]; then
+            git_repo="$env_git_repo"
+        fi
+
+        if [ -n "$env_gitee_repo" ]; then
+            gitee_repo="$env_gitee_repo"
+        fi
+
+        log_success "已读取 .env 仓库配置"
+    else
+        log_warn "未读取到 .env 仓库配置，使用 env-lib 默认仓库地址"
+    fi
+
+    log_title "选择源码仓库"
+    echo -e "  ${COLOR_BOLD}[1]${COLOR_RESET} git   ${git_repo}"
+    echo -e "  ${COLOR_BOLD}[2]${COLOR_RESET} gitee ${gitee_repo}"
+    echo ""
+    echo -e "${COLOR_YELLOW}  提示: 30秒无输入将默认选择 [1] git${COLOR_RESET}"
+    echo ""
+
+    if read -t "$timeout" -p "$(echo -e ${COLOR_CYAN}▸${COLOR_RESET}) [Huasen Log]：请选择 git 或 gitee: " choice; then
+        echo ""
+    else
+        choice="1"
+        echo ""
+        log_warn "输入超时，默认选择 [1] git"
+    fi
+
+    case "$choice" in
+        2|gitee|Gitee|GITEE)
+            selected_name="gitee"
+            selected_repo="$gitee_repo"
+            ;;
+        1|git|Git|GIT|"")
+            selected_name="git"
+            selected_repo="$git_repo"
+            ;;
+        *)
+            log_warn "未知选项: $choice，默认使用 git 仓库"
+            selected_name="git"
+            selected_repo="$git_repo"
+            ;;
+    esac
+
+    printf -v "$target_var" '%s' "$selected_repo"
+    log_success "已选择 ${selected_name} 仓库: ${selected_repo}"
+}
+
+# 从 Git 仓库地址中提取默认目录名
+# 支持 https://host/org/repo.git、ssh://host/org/repo.git、git@host:org/repo.git
+get_git_repo_name() {
+    local repo_url="$1"
+    local repo_name="$repo_url"
+
+    repo_name="${repo_name%%\?*}"
+    repo_name="${repo_name%%#*}"
+    repo_name="${repo_name%/}"
+    repo_name="${repo_name##*/}"
+    repo_name="${repo_name##*:}"
+    repo_name="${repo_name%.git}"
+
+    if [ -z "$repo_name" ]; then
+        log_error "无法从仓库地址解析目录名: $repo_url"
+        exit 1
+    fi
+
+    printf '%s\n' "$repo_name"
 }
 
 # 保存或更新 .env 文件中的配置项
@@ -173,6 +263,16 @@ AES_SECRET_IV=k4h9HdcXmEr83nsF
 
 LICENSE_SIGN_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzH0FRO+VGZ+HWEk2lvY9\nkia0iuZjpE3BRMD4kSZHq28fxJaltHyQDqf2q5iew1hs8bQs7tmhAfax0nl5P26o\nzWyUdmdDWdVD/de3p63NBil1Mo4B0OFeoqqQ5iPcfoJfxUZ4yvozO0Uj3sbHu1Xj\nYjPPt3wA8BW8rj/4ExuHP2noLQTvQtHOyJCCJHszO82wkwjyYKdXm09WsYPkoBQN\nVIlhga5yFa5Kzvu2d3beOxIENH4BqY5UC4N5Y2da4SE0CdCKuhB/cT4BbYNlzCBy\nDF0cbQkfYCWiwDkDGvAEJn65mt1f2rGILe4xoI7ppm44ejYecoz5AMasPVaA8V6H\nqwIDAQAB\n-----END PUBLIC KEY-----\n
 
+# 源码仓库地址
+EOF
+
+    {
+        echo "GIT_REPO=${DEFAULT_GIT_REPO}"
+        echo "GITEE_REPO=${DEFAULT_GITEE_REPO}"
+    } >> "$env_file"
+
+    cat >> "$env_file" <<'EOF'
+
 # ============================================================================
 # 注意事项:
 # 1. 修改端口后需要重启容器: docker-compose restart
@@ -229,9 +329,7 @@ sync_config_files() {
     log_info "  ● Nginx 端口: $NGINX_PORT"
     log_info "  ● Redis 密码: ${REDIS_PASSWORD:0:3}***"
     log_info "  ● Mongo Root: $MONGO_ROOT_USERNAME"
-    log_info "  ● Mongo 数据库用户: $MONGO_APP_USERNAME"
-    log_info "  ● Redis 密码: ${REDIS_PASSWORD:0:3}***"
-    log_info "  ● Mongo 数据库用户: $MONGO_APP_USERNAME"
+    log_info "  ● Mongo User: $MONGO_APP_USERNAME"
     log_info "  ● AES 密钥: ${AES_SECRET_KEY:0:4}***"
     log_info "  ● AES 向量: ${AES_SECRET_IV:0:4}***"
 
@@ -245,7 +343,7 @@ show_env_summary() {
     echo -e "  ${COLOR_CYAN}●${COLOR_RESET} Nginx 端口:        ${COLOR_BOLD}$NGINX_PORT${COLOR_RESET}"
     echo -e "  ${COLOR_CYAN}●${COLOR_RESET} Redis 密码:        ${COLOR_BOLD}${REDIS_PASSWORD:0:3}***${COLOR_RESET}"
     echo -e "  ${COLOR_CYAN}●${COLOR_RESET} Mongo Root 用户:   ${COLOR_BOLD}$MONGO_ROOT_USERNAME${COLOR_RESET}"
-    echo -e "  ${COLOR_CYAN}●${COLOR_RESET} Mongo 数据库用户:   ${COLOR_BOLD}$MONGO_APP_USERNAME${COLOR_RESET}"
+    echo -e "  ${COLOR_CYAN}●${COLOR_RESET} Mongo User 用户:   ${COLOR_BOLD}$MONGO_APP_USERNAME${COLOR_RESET}"
     echo -e "  ${COLOR_CYAN}●${COLOR_RESET} AES 密钥:          ${COLOR_BOLD}${AES_SECRET_KEY:0:4}***${COLOR_RESET}"
     echo -e "  ${COLOR_CYAN}●${COLOR_RESET} AES 向量:          ${COLOR_BOLD}${AES_SECRET_IV:0:4}***${COLOR_RESET}"
     log_separator

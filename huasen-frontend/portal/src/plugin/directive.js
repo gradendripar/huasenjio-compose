@@ -110,6 +110,7 @@ function handleRightMenuShadow(focusClassName) {
 Vue.directive('highlight', function(el) {
   let blocks = el.querySelectorAll('pre code');
   blocks.forEach(block => {
+    if (!/\blanguage-/.test(block.className || '')) return;
     hljs.highlightBlock(block);
   });
 });

@@ -9,7 +9,7 @@ const config = require('../config.js');
 const { getLicenseTokenPayload, verifyLocalLicense } = require('../utils/license/license-check.js');
 const { getLicenseReasonMessage } = require('../utils/license/license-reason.js');
 
-const { aiProvider, aiApp, aiPreset, aiConversation, aiMessage, aiAttachment, aiPluginSource, aiAbility, license } = schemaMap;
+const { aiProvider, aiApp, aiPreset, aiKnowledgePack, aiConversation, aiMessage, aiAttachment, aiPluginSource, aiAbility, article, license } = schemaMap;
 
 let hasClosedSourceAbilityManage = false;
 try {
@@ -108,6 +108,91 @@ function normalizeAppPayload(params = {}) {
     normalized.presetId = resolveAppPresetId(params);
   }
   return normalized;
+}
+
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map(item => String(item || '')).filter(Boolean);
+}
+
+function buildKnowledgePackAppQuery(appId) {
+  return {
+    $or: [{ appIds: { $size: 0 } }, { appIds: appId }],
+  };
+}
+
+function normalizeKnowledgePackPayload(params = {}) {
+  const normalized = params;
+  normalized.appIds = normalizeStringArray(params.appIds);
+  normalized.articleIds = normalizeStringArray(params.articleIds);
+  if (Object.prototype.hasOwnProperty.call(params, 'code')) {
+    normalized.code = normalizePermissionCode(params.code);
+  }
+  if (Object.prototype.hasOwnProperty.call(params, 'maxArticles')) {
+    normalized.maxArticles = Math.max(1, Number(params.maxArticles) || 5);
+  }
+  if (Object.prototype.hasOwnProperty.call(params, 'maxKnowledgeChars')) {
+    normalized.maxKnowledgeChars = Math.max(1000, Number(params.maxKnowledgeChars) || 20000);
+  }
+  return normalized;
+}
+
+async function buildKnowledgePackDisplayList(list = []) {
+  const appIds = [];
+  const articleIds = [];
+  list.forEach(item => {
+    appIds.push(...(item.appIds || []));
+    articleIds.push(...(item.articleIds || []));
+  });
+  const [apps, articles] = await Promise.all([
+    appIds.length ? aiApp.find({ _id: { $in: appIds } }, { name: 1 }) : Promise.resolve([]),
+    articleIds.length ? article.find({ _id: { $in: articleIds } }, { title: 1 }) : Promise.resolve([]),
+  ]);
+  return list.map(item => {
+    const raw = typeof item.toObject === 'function' ? item.toObject() : item;
+    return {
+      ...raw,
+      appNames: (raw.appIds || []).map(id => {
+        const target = apps.find(app => String(app._id) === String(id));
+        return target ? target.name : id;
+      }),
+      articleTitles: (raw.articleIds || []).map(id => {
+        const target = articles.find(article => String(article._id) === String(id));
+        return target ? target.title : id;
+      }),
+    };
+  });
+}
+
+async function buildConversationDisplayList(list = []) {
+  const knowledgePackIds = [];
+  list.forEach(item => {
+    (item.knowledgePackIds || []).forEach(id => knowledgePackIds.push(id));
+  });
+  const packs = knowledgePackIds.length ? await aiKnowledgePack.find({ _id: { $in: knowledgePackIds } }, { name: 1 }) : [];
+  return list.map(item => {
+    const raw = typeof item.toObject === 'function' ? item.toObject() : item;
+    return {
+      ...raw,
+      knowledgePackNames: (raw.knowledgePackIds || []).map(id => {
+        const target = packs.find(pack => String(pack._id) === String(id));
+        return target ? target.name : id;
+      }),
+    };
+  });
+}
+
+async function resolveAvailableKnowledgePackIds({ userCode = 0, appId, knowledgePackIds = [] }) {
+  const ids = normalizeStringArray(knowledgePackIds);
+  if (!ids.length) return [];
+  const packs = await aiKnowledgePack.find({
+    _id: { $in: ids },
+    enabled: true,
+    code: { $lte: normalizePermissionCode(userCode) },
+    ...buildKnowledgePackAppQuery(appId),
+  });
+  const availableIds = packs.map(item => String(item._id));
+  return ids.filter(id => availableIds.includes(String(id)));
 }
 
 async function findPublishedPluginSource() {
@@ -603,6 +688,133 @@ async function removePreset(req, res, next) {
   }
 }
 
+async function findKnowledgePackByList(req, res, next) {
+  try {
+    const { enabled, appId } = req.huasenParams;
+    const query = {};
+    const enabledValue = normalizeBoolean(enabled);
+    if (typeof enabledValue === 'boolean') {
+      query.enabled = enabledValue;
+    }
+    if (appId) {
+      Object.assign(query, buildKnowledgePackAppQuery(appId));
+    }
+    const list = await aiKnowledgePack.find(query).sort({ _id: -1 });
+    global.huasen.responseData(res, await buildKnowledgePackDisplayList(list), 'SUCCESS', '查询知识包列表');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function findKnowledgePackByPage(req, res, next) {
+  try {
+    const { pageNo = 1, pageSize = 10, name, enabled, appId } = req.huasenParams;
+    const query = {};
+    buildRegexQuery(query, 'name', name);
+    const enabledValue = normalizeBoolean(enabled);
+    if (typeof enabledValue === 'boolean') {
+      query.enabled = enabledValue;
+    }
+    if (appId) {
+      Object.assign(query, buildKnowledgePackAppQuery(appId));
+    }
+    const realPageNo = Number(pageNo) || 1;
+    const realPageSize = Number(pageSize) || 10;
+    const [list, total] = await Promise.all([
+      aiKnowledgePack
+        .find(query)
+        .sort({ _id: -1 })
+        .limit(realPageSize)
+        .skip((realPageNo - 1) * realPageSize),
+      aiKnowledgePack.countDocuments(query),
+    ]);
+    global.huasen.responseData(res, { list: await buildKnowledgePackDisplayList(list), total }, 'SUCCESS', '分页查询知识包');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function addKnowledgePack(req, res, next) {
+  try {
+    const params = normalizeKnowledgePackPayload(req.huasenParams);
+    const [insertErr, data] = await req.working([
+      {
+        schemaName: 'aiKnowledgePack',
+        methodName: 'insertMany',
+        payloads: [params],
+      },
+    ]);
+    if (insertErr) {
+      return global.huasen.responseData(res, null, 'ERROR', '新增知识包异常');
+    }
+    global.huasen.responseData(res, data, 'SUCCESS', '新增知识包');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateKnowledgePack(req, res, next) {
+  try {
+    const { _id } = req.huasenParams;
+    const params = normalizeKnowledgePackPayload(req.huasenParams);
+    const [err, data] = await req.working([
+      {
+        schemaName: 'aiKnowledgePack',
+        methodName: 'updateOne',
+        payloads: [{ _id }, { $set: params }, { runValidators: true }],
+      },
+    ]);
+    if (err) {
+      return global.huasen.responseData(res, null, 'ERROR', '更新知识包异常');
+    }
+    global.huasen.responseData(res, data, 'SUCCESS', '更新知识包');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function removeKnowledgePack(req, res, next) {
+  try {
+    const { _id } = req.huasenParams;
+    const result = await aiKnowledgePack.deleteOne({ _id });
+    await aiConversation.updateMany({ knowledgePackIds: _id }, { $pull: { knowledgePackIds: _id } });
+    global.huasen.responseData(res, result, 'SUCCESS', '删除知识包');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function findUserKnowledgePackList(req, res, next) {
+  try {
+    const { proof } = req.huasenJWT;
+    const { appId } = req.huasenParams;
+    const app = await aiApp.findOne({ _id: appId, enabled: true, ...buildAppPermissionQuery(proof.code) });
+    if (!app) {
+      return global.huasen.responseData(res, [], 'SUCCESS', '查询知识包列表');
+    }
+    const list = await aiKnowledgePack
+      .find({
+        enabled: true,
+        code: { $lte: normalizePermissionCode(proof.code) },
+        articleIds: { $exists: true, $ne: [] },
+        ...buildKnowledgePackAppQuery(appId),
+      })
+      .sort({ _id: -1 });
+    const articleIds = [];
+    list.forEach(pack => {
+      (pack.articleIds || []).forEach(id => articleIds.push(id));
+    });
+    const availableArticles = articleIds.length
+      ? await article.find({ _id: { $in: articleIds }, code: { $lte: normalizePermissionCode(proof.code) }, isDraft: false }, { _id: 1 })
+      : [];
+    const availableArticleIds = availableArticles.map(item => String(item._id));
+    const availablePacks = list.filter(pack => (pack.articleIds || []).some(id => availableArticleIds.includes(String(id))));
+    global.huasen.responseData(res, await buildKnowledgePackDisplayList(availablePacks), 'SUCCESS', '查询知识包列表');
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function findUserAppList(req, res, next) {
   try {
     const { proof } = req.huasenJWT;
@@ -637,15 +849,17 @@ async function findUserAppList(req, res, next) {
 async function createConversation(req, res, next) {
   try {
     const { proof } = req.huasenJWT;
-    const { appId, presetId, title, source } = req.huasenParams;
+    const { appId, presetId, title, source, knowledgePackIds = [] } = req.huasenParams;
     const app = await aiApp.findOne({ _id: appId, enabled: true, ...buildAppPermissionQuery(proof.code) });
     if (!app) {
       return global.huasen.responseData(res, null, 'ERROR', '请排查AI应用是否存在/是否禁用/是否无权限');
     }
+    const availableKnowledgePackIds = await resolveAvailableKnowledgePackIds({ userCode: proof.code, appId, knowledgePackIds });
     const params = {
       userId: proof.key,
       appId,
       presetId: presetId || resolveAppPresetId(app) || '',
+      knowledgePackIds: availableKnowledgePackIds,
       title: sanitizeText(title || '新会话') || '新会话',
       summary: '',
       source: normalizeConversationSource(source),
@@ -684,7 +898,7 @@ async function findConversationByPage(req, res, next) {
         .skip((realPageNo - 1) * realPageSize),
       aiConversation.countDocuments(query),
     ]);
-    global.huasen.responseData(res, { list, total }, 'SUCCESS', '分页查询会话');
+    global.huasen.responseData(res, { list: await buildConversationDisplayList(list), total }, 'SUCCESS', '分页查询会话');
   } catch (err) {
     next(err);
   }
@@ -718,7 +932,7 @@ async function findManageConversationByPage(req, res, next) {
         .skip((realPageNo - 1) * realPageSize),
       aiConversation.countDocuments(query),
     ]);
-    global.huasen.responseData(res, { list, total }, 'SUCCESS', '分页查询会话');
+    global.huasen.responseData(res, { list: await buildConversationDisplayList(list), total }, 'SUCCESS', '分页查询会话');
   } catch (err) {
     next(err);
   }
@@ -749,6 +963,20 @@ async function removeManageConversation(req, res, next) {
     const result = await aiConversation.deleteOne({ _id });
     await Promise.all([aiMessage.deleteMany({ conversationId: _id }), aiAttachment.deleteMany({ conversationId: _id })]);
     global.huasen.responseData(res, result, 'SUCCESS', '删除会话');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function removeManyManageConversation(req, res, next) {
+  try {
+    const ids = normalizeStringArray(req.huasenParams._ids || req.huasenParams.ids);
+    if (!ids.length) {
+      return global.huasen.responseData(res, null, 'ERROR', '会话ID不能为空');
+    }
+    const result = await aiConversation.deleteMany({ _id: { $in: ids } });
+    await Promise.all([aiMessage.deleteMany({ conversationId: { $in: ids } }), aiAttachment.deleteMany({ conversationId: { $in: ids } })]);
+    global.huasen.responseData(res, result, 'SUCCESS', '批量删除会话');
   } catch (err) {
     next(err);
   }
@@ -900,7 +1128,7 @@ function writeSSE(res, event, data) {
 
 async function userChatStream(req, res, next) {
   const { proof } = req.huasenJWT;
-  const { appId, presetId, conversationId, content = '', attachmentIds = [], requestParams = {}, source } = req.huasenParams;
+  const { appId, presetId, conversationId, content = '', attachmentIds = [], knowledgePackIds = [], requestParams = {}, source } = req.huasenParams;
   // 防止 XSS 攻击（跨站脚本攻击）
   if (!sanitizeText(content)) {
     res.status(400);
@@ -963,6 +1191,7 @@ async function userChatStream(req, res, next) {
       conversationId,
       content,
       attachmentIds: Array.isArray(attachmentIds) ? attachmentIds : [],
+      knowledgePackIds: Array.isArray(knowledgePackIds) ? knowledgePackIds : [],
       requestParams: Object.prototype.toString.call(requestParams) === '[object Object]' ? requestParams : {},
       source: normalizeConversationSource(source),
       registerAbort(abort) {
@@ -1009,7 +1238,7 @@ async function userChatStream(req, res, next) {
 async function userChat(req, res, next) {
   try {
     const { proof } = req.huasenJWT;
-    const { appId, presetId, conversationId, content = '', attachmentIds = [], requestParams = {}, source } = req.huasenParams;
+    const { appId, presetId, conversationId, content = '', attachmentIds = [], knowledgePackIds = [], requestParams = {}, source } = req.huasenParams;
     if (!sanitizeText(content) && (!Array.isArray(attachmentIds) || attachmentIds.length === 0)) {
       return global.huasen.responseData(res, null, 'ERROR', '消息内容不能为空');
     }
@@ -1021,6 +1250,7 @@ async function userChat(req, res, next) {
       conversationId,
       content,
       attachmentIds: Array.isArray(attachmentIds) ? attachmentIds : [],
+      knowledgePackIds: Array.isArray(knowledgePackIds) ? knowledgePackIds : [],
       requestParams: Object.prototype.toString.call(requestParams) === '[object Object]' ? requestParams : {},
       source: normalizeConversationSource(source),
     });
@@ -1198,6 +1428,13 @@ module.exports = {
   updatePreset,
   removePreset,
 
+  findKnowledgePackByList,
+  findKnowledgePackByPage,
+  addKnowledgePack,
+  updateKnowledgePack,
+  removeKnowledgePack,
+  findUserKnowledgePackList,
+
   getAcceptTypes,
   findUserAppList,
   createConversation,
@@ -1205,6 +1442,7 @@ module.exports = {
   findManageConversationByPage,
   removeConversation,
   removeManageConversation,
+  removeManyManageConversation,
   removeMessages,
   findMessageByConversation,
   findManageMessageByConversation,

@@ -7,4 +7,5 @@ export * from './utils/storage.js';
 export * from './utils/dom.js';
 export * from './utils/api.js';
 export * from './utils/lazyDirective.js';
+export * from './utils/markdown.js';
 export { default as aiPluginMixin } from './mixins/ai-plugin.mixin.js';

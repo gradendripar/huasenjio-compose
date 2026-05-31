@@ -13,7 +13,7 @@
     @cancelDialog="readNotice"
     @close="close"
   >
-    <Markdown :value="noticeContent" :html="true" theme="default"> </Markdown>
+    <Markdown :value="noticeContent" :html="true" theme="github"> </Markdown>
   </HDialog>
 </template>
 <script>

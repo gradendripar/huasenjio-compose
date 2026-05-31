@@ -16,13 +16,20 @@ const {
   addPreset,
   updatePreset,
   removePreset,
+  findKnowledgePackByList,
+  findKnowledgePackByPage,
+  addKnowledgePack,
+  updateKnowledgePack,
+  removeKnowledgePack,
   getAcceptTypes,
   findUserAppList,
+  findUserKnowledgePackList,
   createConversation,
   findConversationByPage,
   findManageConversationByPage,
   removeConversation,
   removeManageConversation,
+  removeManyManageConversation,
   removeMessages,
   findMessageByConversation,
   findManageMessageByConversation,
@@ -55,12 +62,20 @@ router.post('/manage/preset/add', handleJWT(), checkManagePower, handleUselessPa
 router.post('/manage/preset/update', handleJWT(), checkManagePower, handleUselessParams, updatePreset);
 router.post('/manage/preset/remove', handleJWT(), checkManagePower, removePreset);
 
+router.post('/manage/knowledge-pack/list', handleJWT(), checkManagePower, findKnowledgePackByList);
+router.post('/manage/knowledge-pack/findByPage', handleJWT(), checkManagePower, findKnowledgePackByPage);
+router.post('/manage/knowledge-pack/add', handleJWT(), checkManagePower, handleUselessParams, addKnowledgePack);
+router.post('/manage/knowledge-pack/update', handleJWT(), checkManagePower, handleUselessParams, updateKnowledgePack);
+router.post('/manage/knowledge-pack/remove', handleJWT(), checkManagePower, removeKnowledgePack);
+
 router.post('/manage/acceptTypes', handleJWT(), checkManagePower, getAcceptTypes);
 router.post('/manage/conversation/findByPage', handleJWT(), checkManagePower, findManageConversationByPage);
 router.post('/manage/conversation/remove', handleJWT(), checkManagePower, removeManageConversation);
+router.post('/manage/conversation/removeMany', handleJWT(), checkManagePower, removeManyManageConversation);
 router.post('/manage/message/findByConversation', handleJWT(), checkManagePower, findManageMessageByConversation);
 
 router.post('/user/app/list', handleJWT(), findUserAppList);
+router.post('/user/knowledge-pack/list', handleJWT(), findUserKnowledgePackList);
 router.post('/user/conversation/create', handleJWT(), handleUselessParams, createConversation);
 router.post('/user/conversation/findByPage', handleJWT(), findConversationByPage);
 router.post('/user/conversation/remove', handleJWT(), removeConversation);

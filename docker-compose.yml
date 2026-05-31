@@ -106,11 +106,12 @@ services:
     # 挂载日志、静态文件目录、依赖库、服务参数、项目配置、前端构建包、环境变量文件
     volumes:
       - ./.env:/app/.env
-      - ./huasen-store/:/app/huasen-store
+      - ./bin/:/app/bin
       - ./huasen-log/:/app/huasen-server/log
+      - ./huasen-store/:/app/huasen-store
+      - ./huasen-server/public/:/app/huasen-server/public
       - ./huasen-server/setting.json:/app/huasen-server/setting.json
       - ./huasen-server/config.js:/app/huasen-server/config.js
-      - ./huasen-server/public/webapp/:/app/huasen-server/public/webapp/
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
       - "3000:3000"

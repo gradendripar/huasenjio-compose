@@ -11,8 +11,8 @@
         </slot>
       </div>
     </div>
-    <ul v-if="computedShowAnchors && anchors.length" class="area-catalog">
-      <li v-for="(item, index) in anchors" :key="index" :style="handleStyle(item)">
+    <ul v-if="computedShowAnchors && anchors.length" class="area-catalog" :class="catalogClass">
+      <li v-for="(item, index) in anchors" :key="index" :class="getCatalogItemClass(item)">
         <i
           v-if="item.tagName === 'H1' || item.tagName === 'H2' || item.tagName === 'H3'"
           :class="{ h1Point: item.tagName === 'H1', h2Point: item.tagName === 'H2', h3Point: item.tagName === 'H3' }"
@@ -35,6 +35,7 @@ const sub = require('markdown-it-sub').default;
 const sup = require('markdown-it-sup').default;
 const ins = require('markdown-it-ins').default;
 import hljs from 'highlight.js';
+import { normalizeLooseMarkdownCodeFences } from '@huasen/shared';
 
 // 创建 markdown-it 实例的工厂函数
 function createMarkdownIt(options = {}) {
@@ -133,17 +134,22 @@ export default {
       type: Boolean,
       default: false,
     },
-    // 样式主题：'default'（自定义风格）| 'github'（GitHub 风格）| 'typora'（Typora 风格）| 'medium'（Medium 风格）
+    // 样式主题：'github'（GitHub 风格）| 'default'（旧自定义风格）| 'typora'（Typora 风格）
     theme: {
       type: String,
-      default: 'default',
-      validator: v => ['default', 'github', 'typora', 'medium'].includes(v),
+      default: 'github',
+      validator: v => ['default', 'github', 'typora'].includes(v),
     },
     // 是否显示目录锚点（true/false/'auto'，auto 时根据宽度自动判断）
     showAnchors: {
       type: [Boolean, String],
       default: 'auto',
       validator: v => [true, false, 'auto'].includes(v),
+    },
+    // 仅用于 AI 输出容错：修复模型生成的非标准嵌套代码围栏
+    looseCodeFence: {
+      type: Boolean,
+      default: false,
     },
   },
   computed: {
@@ -155,6 +161,11 @@ export default {
     bodyClass() {
       return {
         [`body-${this.theme}`]: true,
+      };
+    },
+    catalogClass() {
+      return {
+        [`catalog-${this.theme}`]: true,
       };
     },
     // 计算是否显示锚点
@@ -171,7 +182,8 @@ export default {
       handler(nV) {
         // 根据 html 配置选择不同的 markdown 实例
         const md = this.html ? mdInstances.withHtml : mdInstances.noHtml;
-        this.content = md.render(nV);
+        const source = this.looseCodeFence ? normalizeLooseMarkdownCodeFences(nV) : nV;
+        this.content = md.render(source);
         this.$nextTick(() => {
           this.collectAnchors();
           this.setupImageZoom();
@@ -182,7 +194,7 @@ export default {
   },
   mounted() {
     // 仅在文章模式下监听宽度变化
-    if (this.showAnchors === 'auto' && this.theme === 'default') {
+    if (this.showAnchors === 'auto') {
       this.observer = new ResizeObserver(([entry]) => {
         let { width } = entry.contentRect;
         this.internalShowAnchors = width >= 645;
@@ -196,20 +208,20 @@ export default {
     }
   },
   methods: {
-    handleStyle(item) {
-      let style = {};
+    getCatalogItemClass(item) {
+      let className = '';
       switch (item.tagName) {
         case 'H1':
-          style = { paddingLeft: '0px', fontWeight: '500' };
+          className = 'catalog-item-h1';
           break;
         case 'H2':
-          style = { paddingLeft: '8px', color: '#6a6a6a' };
+          className = 'catalog-item-h2';
           break;
         case 'H3':
-          style = { paddingLeft: '16px', fontSize: '12px' };
+          className = 'catalog-item-h3';
           break;
       }
-      return style;
+      return className;
     },
 
     collectAnchors() {
@@ -256,6 +268,9 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@import '~@huasen/ui/src/styles/markdown-github.scss';
+@import '~@huasen/ui/src/styles/markdown-typora.scss';
+
 .h-markdown-container {
   * {
     box-sizing: border-box;
@@ -279,6 +294,13 @@ export default {
       width: 100%;
       display: flex;
       align-items: center;
+      color: var(--gray-700);
+      line-height: 1.8;
+      .text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .h1Point {
         position: absolute;
         left: -2px;
@@ -305,6 +327,85 @@ export default {
         border-radius: 50%;
         background-color: var(--yellow-400);
         z-index: 1;
+      }
+    }
+    .catalog-item-h1 {
+      padding-left: 0;
+      font-weight: 500;
+    }
+    .catalog-item-h2 {
+      padding-left: 8px;
+      color: var(--gray-600);
+    }
+    .catalog-item-h3 {
+      padding-left: 16px;
+      color: var(--gray-500);
+      font-size: 12px;
+    }
+    &.catalog-default {
+      border-left-color: var(--gray-200);
+      .catalog-item-h2 {
+        color: #6a6a6a;
+      }
+      .catalog-item-h3 {
+        color: var(--gray-700);
+      }
+      .h1Point {
+        border-left-color: var(--red-500);
+      }
+      .h2Point {
+        background-color: var(--red-400);
+      }
+      .h3Point {
+        background-color: var(--yellow-400);
+      }
+    }
+    &.catalog-github {
+      border-left-color: var(--gray-300);
+      li {
+        color: var(--gray-700);
+      }
+      .catalog-item-h1 {
+        color: var(--gray-900);
+      }
+      .catalog-item-h2 {
+        color: var(--gray-700);
+      }
+      .catalog-item-h3 {
+        color: var(--gray-600);
+      }
+      .h1Point {
+        border-left-color: #0969da;
+      }
+      .h2Point {
+        background-color: #0969da;
+      }
+      .h3Point {
+        background-color: var(--gray-500);
+      }
+    }
+    &.catalog-typora {
+      border-left-color: var(--gray-300);
+      li {
+        color: var(--gray-700);
+      }
+      .catalog-item-h1 {
+        color: var(--gray-900);
+      }
+      .catalog-item-h2 {
+        color: var(--gray-600);
+      }
+      .catalog-item-h3 {
+        color: var(--gray-500);
+      }
+      .h1Point {
+        border-left-color: var(--gray-700);
+      }
+      .h2Point {
+        background-color: var(--gray-500);
+      }
+      .h3Point {
+        background-color: var(--gray-400);
       }
     }
   }
@@ -579,506 +680,11 @@ export default {
 
 // ==================== GitHub 风格 ====================
 ::v-deep .body-github {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 1.6;
-  word-wrap: break-word;
-
-  // 标题
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    margin-top: 24px;
-    margin-bottom: 16px;
-    font-weight: 600;
-    line-height: 1.25;
-    color: var(--gray-900);
-  }
-  h1 {
-    font-size: 2em;
-    padding-bottom: 0.3em;
-    border-bottom: 1px solid var(--gray-300);
-  }
-  h2 {
-    font-size: 1.5em;
-    padding-bottom: 0.3em;
-    border-bottom: 1px solid var(--gray-300);
-  }
-  h3 {
-    font-size: 1.25em;
-  }
-  h4 {
-    font-size: 1em;
-  }
-  h5 {
-    font-size: 0.875em;
-  }
-  h6 {
-    font-size: 0.85em;
-    color: var(--gray-600);
-  }
-
-  // 段落
-  p {
-    margin-top: 0;
-    margin-bottom: 16px;
-  }
-
-  // 链接
-  a {
-    color: #0969da;
-    text-decoration: none;
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-
-  // 列表
-  ul,
-  ol {
-    margin-top: 0;
-    margin-bottom: 16px;
-    padding-left: 2em;
-  }
-  li {
-    margin-top: 0.25em;
-    list-style-position: outside;
-  }
-  ul ul,
-  ul ol,
-  ol ul,
-  ol ol {
-    margin-top: 0;
-    margin-bottom: 0;
-  }
-
-  // 引用
-  blockquote {
-    margin: 0 0 16px;
-    padding: 0 1em;
-    color: var(--gray-600);
-    border-left: 0.25em solid var(--gray-300);
-    p {
-      color: var(--gray-600);
-    }
-  }
-
-  // 代码
-  code {
-    font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
-    font-size: 0.85em;
-    padding: 0.2em 0.4em;
-    margin: 0;
-    background-color: rgba(175, 184, 193, 0.2);
-    border-radius: 6px;
-  }
-  pre {
-    margin-top: 0;
-    margin-bottom: 16px;
-    padding: 16px;
-    overflow: auto;
-    font-size: 0.85em;
-    line-height: 1.45;
-    background-color: #f6f8fa;
-    border-radius: 6px;
-  }
-  pre code {
-    padding: 0;
-    margin: 0;
-    background: transparent;
-    white-space: pre;
-    font-size: 100%;
-  }
-
-  // 表格
-  table {
-    border-spacing: 0;
-    border-collapse: collapse;
-    display: block;
-    margin-top: 0;
-    margin-bottom: 16px;
-    width: max-content;
-    max-width: 100%;
-    overflow: auto;
-  }
-  table tr {
-    background-color: var(--gray-0);
-    border-top: 1px solid hsl(210, 18%, 82%);
-  }
-  table tr:nth-child(2n) {
-    background-color: #f6f8fa;
-  }
-  table th,
-  table td {
-    padding: 6px 13px;
-    border: 1px solid hsl(210, 18%, 82%);
-  }
-  table th {
-    font-weight: 600;
-    background-color: #f6f8fa;
-  }
-
-  // 分隔线
-  hr {
-    height: 0.25em;
-    padding: 0;
-    margin: 24px 0;
-    background-color: var(--gray-300);
-    border: 0;
-  }
-
-  // 图片
-  img {
-    max-width: 100%;
-    box-sizing: content-box;
-    background-color: var(--gray-0);
-    border-radius: 6px;
-  }
-
-  // 强调
-  strong,
-  b {
-    font-weight: 600;
-  }
-  em,
-  i {
-    font-style: italic;
-  }
+  @include markdown-github-content;
 }
 
 // ==================== Typora 风格（简洁优雅） ====================
 ::v-deep .body-typora {
-  font-family: 'Source Sans Pro', 'Noto Sans SC', sans-serif;
-  font-size: 15px;
-  line-height: 1.7;
-  color: #333;
-
-  // 标题
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    font-family: 'Source Sans Pro', 'Noto Sans SC', sans-serif;
-    color: #333;
-    font-weight: bold;
-    line-height: 1.4;
-    margin-top: 1.5em;
-    margin-bottom: 0.8em;
-    border-bottom: none;
-  }
-  h1 {
-    font-size: 1.8em;
-    text-align: center;
-    margin-top: 0;
-    padding-bottom: 0.5em;
-    border-bottom: 1px solid #eee;
-  }
-  h2 {
-    font-size: 1.4em;
-    border-left: 4px solid #42b983;
-    padding-left: 10px;
-  }
-  h3 {
-    font-size: 1.2em;
-  }
-  h4 {
-    font-size: 1.1em;
-  }
-  h5,
-  h6 {
-    font-size: 1em;
-  }
-
-  // 段落
-  p {
-    margin: 0.8em 0;
-    text-align: justify;
-  }
-
-  // 链接
-  a {
-    color: #42b983;
-    text-decoration: none;
-    border-bottom: 1px solid transparent;
-    &:hover {
-      border-bottom-color: #42b983;
-    }
-  }
-
-  // 引用
-  blockquote {
-    margin: 1em 0;
-    padding: 0.5em 1em;
-    border-left: 4px solid #42b983;
-    background-color: #f8f8f8;
-    color: #666;
-    p {
-      margin: 0.5em 0;
-    }
-  }
-
-  // 代码
-  code {
-    font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', monospace;
-    font-size: 0.9em;
-    padding: 2px 6px;
-    background-color: rgba(66, 185, 131, 0.1);
-    color: #e96900;
-    border-radius: 3px;
-  }
-  pre {
-    margin: 1em 0;
-    padding: 1em;
-    background-color: #282c34;
-    border-radius: 6px;
-    overflow-x: auto;
-  }
-  pre code {
-    background: transparent;
-    color: #abb2bf;
-    padding: 0;
-  }
-
-  // 列表
-  ul,
-  ol {
-    padding-left: 2em;
-    margin: 0.8em 0;
-  }
-  li {
-    margin: 0.3em 0;
-  }
-
-  // 表格
-  table {
-    border-collapse: collapse;
-    margin: 1em 0;
-    width: 100%;
-  }
-  table th,
-  table td {
-    padding: 10px 14px;
-    border: 1px solid #e0e0e0;
-  }
-  table th {
-    background-color: #f5f5f5;
-    font-weight: bold;
-  }
-  table tr:nth-child(2n) {
-    background-color: #fafafa;
-  }
-
-  // 分隔线
-  hr {
-    border: none;
-    border-top: 1px solid #eee;
-    margin: 2em 0;
-  }
-
-  // 图片
-  img {
-    max-width: 100%;
-    border-radius: 4px;
-    margin: 1em auto;
-    display: block;
-  }
-
-  // 强调
-  strong,
-  b {
-    color: #e96900;
-    font-weight: bold;
-  }
-  em,
-  i {
-    color: #42b983;
-    font-style: italic;
-  }
-}
-
-// ==================== Medium 风格（阅读优先） ====================
-::v-deep .body-medium {
-  font-family: medium-content-serif-font, Georgia, Cambria, 'Times New Roman', Times, serif;
-  font-size: 18px;
-  line-height: 1.8;
-  color: rgba(0, 0, 0, 0.84);
-
-  // 标题
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    font-family: 'Lucida Grande', 'Helvetica Neue', sans-serif;
-    font-weight: 700;
-    color: rgba(0, 0, 0, 0.84);
-    line-height: 1.2;
-    margin-top: 1.5em;
-    margin-bottom: 0.5em;
-    border-bottom: none;
-  }
-  h1 {
-    font-size: 1.8em;
-  }
-  h2 {
-    font-size: 1.5em;
-  }
-  h3 {
-    font-size: 1.3em;
-  }
-  h4 {
-    font-size: 1.1em;
-  }
-  h5,
-  h6 {
-    font-size: 1em;
-  }
-
-  // 段落
-  p {
-    margin-bottom: 1.5em;
-    letter-spacing: 0.01rem;
-  }
-
-  // 链接
-  a {
-    color: inherit;
-    background-image: linear-gradient(120deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 100%);
-    background-repeat: repeat-x;
-    background-size: 2px 2px;
-    background-position: 0 95%;
-    text-decoration: none;
-    &:hover {
-      color: rgba(0, 0, 0, 1);
-    }
-  }
-
-  // 引用
-  blockquote {
-    margin: 1.5em 0;
-    padding: 1em 1.5em;
-    border-left: 3px solid rgba(0, 0, 0, 0.84);
-    background-color: rgba(0, 0, 0, 0.05);
-    font-style: italic;
-    p {
-      margin-bottom: 0;
-      color: rgba(0, 0, 0, 0.68);
-    }
-  }
-
-  // 代码
-  code {
-    font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-    font-size: 0.85em;
-    padding: 3px 6px;
-    background-color: rgba(0, 0, 0, 0.05);
-    border-radius: 2px;
-    color: rgba(0, 0, 0, 0.84);
-  }
-  pre {
-    margin: 1.5em 0;
-    padding: 1em;
-    background-color: rgba(0, 0, 0, 0.05);
-    border-radius: 4px;
-    overflow-x: auto;
-    font-size: 0.9em;
-  }
-  pre code {
-    padding: 0;
-    background: transparent;
-  }
-
-  // 列表
-  ul,
-  ol {
-    padding-left: 1.5em;
-    margin-bottom: 1.5em;
-  }
-  li {
-    margin-bottom: 0.5em;
-  }
-
-  // 表格
-  table {
-    border-collapse: collapse;
-    margin: 1.5em 0;
-    width: 100%;
-    font-size: 0.95em;
-  }
-  table th,
-  table td {
-    padding: 12px 16px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-    text-align: left;
-  }
-  table th {
-    font-weight: 700;
-    border-top: 2px solid rgba(0, 0, 0, 0.84);
-  }
-
-  // 分隔线
-  hr {
-    border: none;
-    text-align: center;
-    margin: 2em 0;
-    &::before {
-      content: '···';
-      font-size: 1.5em;
-      letter-spacing: 0.5em;
-      color: rgba(0, 0, 0, 0.4);
-    }
-  }
-
-  // 图片
-  img {
-    max-width: 100%;
-    margin: 1.5em auto;
-    display: block;
-  }
-
-  // 引用
-  blockquote {
-    margin: 1.5em 0;
-    padding: 0.5em 1.5em;
-    border-left: 3px solid rgba(0, 0, 0, 0.84);
-    font-style: italic;
-    color: rgba(0, 0, 0, 0.6);
-  }
-
-  // 代码
-  code {
-    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
-    font-size: 0.9em;
-    padding: 2px 6px;
-    background-color: rgba(0, 0, 0, 0.05);
-    border-radius: 4px;
-  }
-  pre {
-    margin: 1.5em 0;
-    padding: 1em;
-    background-color: rgba(0, 0, 0, 0.05);
-    border-radius: 6px;
-    overflow-x: auto;
-  }
-  pre code {
-    padding: 0;
-    background: transparent;
-  }
-
-  // 强调
-  strong,
-  b {
-    font-weight: 700;
-  }
-  em,
-  i {
-    font-style: italic;
-  }
+  @include markdown-typora-content;
 }
 </style>

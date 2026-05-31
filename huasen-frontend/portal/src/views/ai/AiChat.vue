@@ -74,7 +74,7 @@
                     <span class="att-name">{{ att.name }}</span>
                   </div>
                 </div>
-                <Markdown v-if="msg.content" :value="msg.content" :showFooter="false" :showAnchors="false" theme="github" :html="false" class="message-markdown" />
+                <Markdown v-if="msg.content" :value="msg.content" :showFooter="false" :showAnchors="false" theme="github" :html="false" :looseCodeFence="msg.role === 'assistant'" class="message-markdown" />
                 <!-- loading光标 -->
                 <span v-if="msg.streaming" class="streaming-cursor"></span>
                 <template v-else>
@@ -112,6 +112,32 @@
           </div>
         </div>
         <div class="input-area">
+          <div v-if="knowledgePacks.length > 0" class="input-toolbar">
+            <el-tooltip :disabled="!knowledgeSelectDisabled" :content="knowledgeSelectDisabledReason" placement="top">
+              <div class="knowledge-select">
+                <el-select
+                  v-model="selectedKnowledgePackIds"
+                  :multiple-limit="3"
+                  :disabled="knowledgeSelectDisabled"
+                  multiple
+                  filterable
+                  clearable
+                  collapse-tags
+                  popper-class="knowledge-select-popper"
+                  placeholder="选择知识包"
+                  size="mini"
+                >
+                  <i slot="prefix" class="el-icon-collection knowledge-select__prefix"></i>
+                  <el-option v-for="pack in knowledgePacks" :key="pack._id" :label="pack.name" :value="pack._id">
+                    <div class="knowledge-option">
+                      <div class="knowledge-option__name">{{ pack.name }}</div>
+                      <div :title="pack.description" class="knowledge-option__desc">{{ pack.description || '--' }}</div>
+                    </div>
+                  </el-option>
+                </el-select>
+              </div>
+            </el-tooltip>
+          </div>
           <div class="input-row">
             <input ref="fileInput" type="file" multiple style="display: none" @change="handleFileSelect" :accept="fileAccept" />
             <div class="input-body">
@@ -135,9 +161,11 @@
               ></textarea>
             </div>
             <div class="input-tool">
-              <el-tooltip v-if="currentApp && (currentApp.allowImage || currentApp.allowFile)" :content="`支持${fileAccept.split(',').join('、')}文件`" placement="top">
-                <el-button class="attach-btn" icon="el-icon-paperclip" :disabled="loading" @click.native="triggerFileSelect"></el-button>
-              </el-tooltip>
+              <div class="input-tool-left">
+                <el-tooltip v-if="currentApp && (currentApp.allowImage || currentApp.allowFile)" :content="`支持${fileAccept.split(',').join('、')}文件`" placement="top">
+                  <el-button class="attach-btn" icon="el-icon-paperclip" :disabled="loading" @click.native="triggerFileSelect"></el-button>
+                </el-tooltip>
+              </div>
               <button v-if="streaming" class="send-btn" :disabled="!canStop" @click="abortStream">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                   <rect x="6" y="6" width="12" height="12" rx="1"></rect>
@@ -169,11 +197,14 @@ export default {
     return {
       apps: [],
       currentAppId: '',
+      knowledgePacks: [],
+      selectedKnowledgePackIds: [],
       conversations: [],
       conversationTotal: 0,
       pageNo: 1,
       pageSize: 10,
       currentConversationId: '',
+      currentConversationKnowledgePackIds: [],
       messages: [],
       inputMessage: '',
       selectedFiles: [],
@@ -229,6 +260,20 @@ export default {
     },
     canStop() {
       return !this.needLogin && this.currentApp && this.streaming;
+    },
+    conversationHasKnowledgePacks() {
+      return this.currentConversationKnowledgePackIds.length > 0;
+    },
+    canSelectKnowledgePacks() {
+      return !this.streaming && !this.conversationHasKnowledgePacks;
+    },
+    knowledgeSelectDisabled() {
+      return !this.canSelectKnowledgePacks;
+    },
+    knowledgeSelectDisabledReason() {
+      if (this.streaming) return 'AI正在生成回复中';
+      if (this.conversationHasKnowledgePacks) return '当前会话已绑定知识包';
+      return '';
     },
     // 获取图片完整 URL（兼容相对路径和绝对 URL）
     getAppIconUrl() {
@@ -436,6 +481,7 @@ export default {
             if (this.conversations.length > 0) {
               this.switchConversation(this.conversations[0]);
             }
+            await this.loadKnowledgePacks();
           }
         }
         // 关闭弹出
@@ -463,6 +509,22 @@ export default {
         console.error('加载会话列表失败', err);
       }
     },
+    async loadKnowledgePacks() {
+      if (!this.currentAppId) {
+        this.knowledgePacks = [];
+        this.selectedKnowledgePackIds = [];
+        return;
+      }
+      try {
+        const res = await this.API.AI.findKnowledgePackList({ appId: this.currentAppId }, { loading: false, notify: false });
+        this.knowledgePacks = Array.isArray(res.data) ? res.data : [];
+        const validIds = this.knowledgePacks.map(item => item._id);
+        this.selectedKnowledgePackIds = this.selectedKnowledgePackIds.filter(id => validIds.includes(id));
+      } catch (err) {
+        this.knowledgePacks = [];
+        this.selectedKnowledgePackIds = [];
+      }
+    },
     async loadMessages(conversationId) {
       if (!conversationId) {
         this.messages = [];
@@ -478,10 +540,13 @@ export default {
     },
     async handleAppChange() {
       this.currentConversationId = '';
+      this.currentConversationKnowledgePackIds = [];
       this.messages = [];
+      this.selectedKnowledgePackIds = [];
       this.pageNo = 1;
       // 更新 URL 参数
       this.updateUrlParams({ appId: this.currentAppId });
+      await this.loadKnowledgePacks();
       await this.loadConversations();
       // 切换应用时，如果有会话，默认选择第一个
       if (this.conversations.length > 0) {
@@ -493,14 +558,18 @@ export default {
       this.resetActiveStreamState();
 
       this.currentConversationId = '';
+      this.currentConversationKnowledgePackIds = [];
       this.messages = [];
       this.inputMessage = '';
       this.selectedFiles = [];
+      this.selectedKnowledgePackIds = [];
     },
     switchConversation(conv) {
       if (this.currentConversationId === conv._id) return;
       this.abortStream();
       this.currentConversationId = conv._id;
+      this.currentConversationKnowledgePackIds = Array.isArray(conv.knowledgePackIds) ? [].concat(conv.knowledgePackIds) : [];
+      this.selectedKnowledgePackIds = [].concat(this.currentConversationKnowledgePackIds);
       this.loadMessages(conv._id);
       // 移动端切换会话后自动关闭侧边栏
       if (this.isMobile) {
@@ -521,6 +590,7 @@ export default {
               this.switchConversation(this.conversations[0]);
             } else {
               this.currentConversationId = '';
+              this.currentConversationKnowledgePackIds = [];
               this.messages = [];
             }
           }
@@ -588,6 +658,7 @@ export default {
       this.autoScrollEnabled = true;
       const content = this.inputMessage.trim();
       const files = [...this.selectedFiles];
+      const requestKnowledgePackIds = this.canSelectKnowledgePacks ? this.selectedKnowledgePackIds : [];
       this.loading = true;
       let attachmentIds = [];
 
@@ -682,6 +753,7 @@ export default {
             conversationId: this.currentConversationId,
             content,
             attachmentIds,
+            knowledgePackIds: requestKnowledgePackIds,
           }),
           signal: this.abortController.signal,
           openWhenHidden: true,
@@ -711,6 +783,11 @@ export default {
               return;
             }
             if (event.event === 'conversation') {
+              if (payload.conversation) {
+                const conversationKnowledgePackIds = Array.isArray(payload.conversation.knowledgePackIds) ? [].concat(payload.conversation.knowledgePackIds) : [];
+                this.currentConversationKnowledgePackIds = conversationKnowledgePackIds;
+                this.selectedKnowledgePackIds = [].concat(conversationKnowledgePackIds);
+              }
               if (payload.userMessage) {
                 realUserMessageId = payload.userMessage._id;
                 this.$set(this.messages, userMessageIndex, {
@@ -806,9 +883,13 @@ export default {
     copyMessageContent(msg) {
       const text = msg.content || '';
       if (!text) return;
-      tool.copyTextToClip(text, () => {
-        this.$tips('success', '已拷贝到剪贴板', 'top-right', 1200);
-      });
+      tool.copyTextToClip(
+        text,
+        () => {
+          this.$tips('success', '已拷贝到剪贴板', 'top-right', 1200);
+        },
+        true,
+      );
     },
 
     /**
@@ -988,6 +1069,64 @@ export default {
 };
 </script>
 
+<style lang="scss">
+.knowledge-select-popper {
+  width: 186px !important;
+  min-width: 186px !important;
+
+  .el-select-dropdown__item {
+    position: relative;
+    height: auto;
+    min-height: 52px;
+    line-height: 1.4;
+    padding: 8px 32px 8px 12px;
+  }
+
+  .el-select-dropdown__item.selected::after {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-top: 0;
+  }
+
+  .knowledge-option {
+    max-width: 200px;
+  }
+
+  .knowledge-option__name {
+    font-size: 14px;
+    line-height: 18px;
+    color: var(--gray-900);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .knowledge-option__desc {
+    margin-top: 2px;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--gray-500);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 768px) {
+  .knowledge-select-popper {
+    width: 150px !important;
+    min-width: 150px !important;
+
+    .knowledge-option {
+      max-width: 150px;
+    }
+  }
+}
+</style>
+
 <style lang="scss" scoped>
 .ai-chat-container {
   width: 100%;
@@ -1002,8 +1141,6 @@ export default {
 .ai-chat {
   width: calc(100% - 20px);
   height: calc(100% - 20px);
-  // width: 100%;
-  // height: 100%;
   display: flex;
   border-radius: 4px;
   background-color: var(--gray-0);
@@ -1108,6 +1245,9 @@ export default {
   gap: 12px;
   .header-info {
     flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
     overflow: hidden;
     h3 {
       margin: 0 0 4px 0;
@@ -1123,6 +1263,10 @@ export default {
       justify-content: flex-end;
       margin-right: -12px;
     }
+  }
+  .app-select {
+    width: 240px;
+    flex-shrink: 0;
   }
   .toggle-sidebar-btn {
     flex-shrink: 0;
@@ -1344,9 +1488,16 @@ export default {
     opacity: 1;
   }
 }
+
 .input-area {
   background: var(--gray-50);
-  padding: 12px 24px 20px;
+  padding: 8px 24px 20px;
+  .input-toolbar {
+    min-height: 34px;
+    display: flex;
+    align-items: center;
+    padding: 0 0 8px;
+  }
   .input-row {
     display: flex;
     justify-content: flex-end;
@@ -1366,6 +1517,81 @@ export default {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 10px;
+  }
+  .input-tool-left {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .knowledge-select {
+    width: 186px;
+    min-width: 0;
+    height: 28px;
+    position: relative;
+    display: block;
+    padding: 0;
+    flex-shrink: 1;
+    ::v-deep .el-select {
+      width: 100%;
+      & > .el-input {
+        .el-input__prefix {
+          width: 24px;
+          line-height: 24px;
+          pointer-events: none;
+        }
+        .el-input__inner {
+          height: 26px;
+          line-height: 26px;
+          font-size: 12px;
+          border-radius: 24px;
+        }
+      }
+      & > .el-select__tags {
+        flex-wrap: nowrap;
+        padding-left: 30px;
+        & > span {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          overflow: hidden;
+          .el-tag {
+            min-width: 44px;
+            max-width: 100%;
+            flex: 0 1 auto;
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            height: 20px;
+            margin: 2px 0 2px 2px;
+            border-radius: 10px;
+            overflow: hidden;
+            &:not(:first-child) {
+              flex: 0 0 auto;
+            }
+            .el-select__tags-text {
+              min-width: 0;
+              max-width: 100%;
+              display: block;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              word-break: break-all;
+            }
+            .el-tag__close {
+              flex-shrink: 0;
+              position: relative;
+              right: -5px;
+              top: 1px;
+            }
+          }
+        }
+        .el-select__input {
+          margin-left: 0;
+        }
+      }
+    }
   }
   .attach-btn {
     flex-shrink: 0;
@@ -1515,6 +1741,7 @@ export default {
     height: 52px;
     .header-info {
       .app-select {
+        width: 100%;
         ::v-deep .el-input__inner {
           font-size: 14px;
           padding: 0 30px 0 10px;
@@ -1584,17 +1811,27 @@ export default {
   }
   .input-area {
     padding: 10px 12px 16px;
+    .input-toolbar {
+      min-height: 32px;
+      padding: 0 0 8px;
+    }
     .input-row {
       padding: 10px;
     }
     .input-textarea {
-      font-size: 15px;
+      font-size: 14px;
       line-height: 22px;
       min-height: 22px;
     }
     .send-btn {
       width: 36px;
       height: 36px;
+    }
+    .input-tool-left {
+      max-width: calc(100% - 46px);
+    }
+    .knowledge-select {
+      width: 150px;
     }
   }
   .sidebar-footer {
@@ -1616,7 +1853,7 @@ export default {
       font-size: 14px;
     }
     .conv-meta {
-      font-size: 11px;
+      font-size: 12px;
     }
   }
 }

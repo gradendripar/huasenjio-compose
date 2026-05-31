@@ -149,9 +149,13 @@ export function judgeIE() {
  */
 export function copyTextToClip(content, callback, line = false) {
   var copyEl = document.createElement(line ? "textarea" : "input");
-  copyEl.setAttribute("value", content);
+  copyEl.value = content;
+  copyEl.setAttribute("readonly", "readonly");
+  copyEl.style.position = "fixed";
+  copyEl.style.left = "-9999px";
   document.body.appendChild(copyEl);
   copyEl.select();
+  copyEl.setSelectionRange(0, copyEl.value.length);
   document.execCommand("copy");
   document.body.removeChild(copyEl);
   if (typeof callback === "function") {

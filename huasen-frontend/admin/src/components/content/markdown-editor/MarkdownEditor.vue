@@ -7,7 +7,7 @@
 -->
 
 <template>
-  <div class="h-markdown-editor">
+  <div class="h-markdown-editor" v-loading="normalizing" element-loading-text="正在规范化 Markdown...">
     <mavon-editor
       ref="mavonEditor"
       class="markdown-editor"
@@ -22,6 +22,7 @@
       @save="save"
       @change="change"
       @imgAdd="handleImgAdd"
+      @paste.native.capture="handlePaste"
     >
     </mavon-editor>
   </div>
@@ -30,6 +31,7 @@
 <script>
 import { mavonEditor } from 'mavon-editor'; // 引入markdowm语法编辑器
 import 'mavon-editor/dist/css/index.css'; // 编辑器风格样式文件
+import { normalizeLooseMarkdownCodeFences } from '@huasen/shared';
 
 export default {
   name: 'MarkdownEditor',
@@ -70,6 +72,8 @@ export default {
         toolbarsFlag: false,
         scrollStyle: true,
       },
+      normalizing: false,
+      normalizeTimer: null,
     };
   },
   props: {
@@ -83,6 +87,10 @@ export default {
     },
     onImgAdd: {
       type: Function,
+    },
+    normalizeLooseCodeFence: {
+      type: Boolean,
+      default: true,
     },
   },
   computed: {
@@ -98,12 +106,53 @@ export default {
   components: {
     mavonEditor,
   },
+  beforeDestroy() {
+    if (this.normalizeTimer) {
+      clearTimeout(this.normalizeTimer);
+    }
+  },
   methods: {
     save(value, text) {
+      const nextValue = this.getNormalizedValue(value);
+      if (nextValue !== value) {
+        this.$emit('update:value', nextValue);
+        this.$nextTick(() => {
+          this.$emit('onSave');
+        });
+        return;
+      }
       this.$emit('onSave');
     },
     change() {
       this.$emit('change');
+    },
+    handlePaste() {
+      if (!this.normalizeLooseCodeFence) {
+        return;
+      }
+      if (this.normalizeTimer) {
+        clearTimeout(this.normalizeTimer);
+      }
+      this.normalizing = true;
+      this.normalizeTimer = setTimeout(() => {
+        this.normalizeValue(this.value);
+      }, 120);
+    },
+    getNormalizedValue(value) {
+      if (!this.normalizeLooseCodeFence || !value || value.indexOf('```') < 0) {
+        return value;
+      }
+      return normalizeLooseMarkdownCodeFences(value);
+    },
+    normalizeValue(value) {
+      try {
+        const nextValue = this.getNormalizedValue(value);
+        if (nextValue !== value) {
+          this.$emit('update:value', nextValue);
+        }
+      } finally {
+        this.normalizing = false;
+      }
     },
     async handleImgAdd(position, file) {
       let url = await this.onImgAdd(position, file);
@@ -114,6 +163,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@import '~@huasen/ui/src/styles/markdown-github.scss';
+
 .h-markdown-editor {
   width: 100%;
   position: relative;
@@ -126,41 +177,7 @@ export default {
     }
     .v-note-show {
       .v-show-content {
-        ul,
-        ol {
-          padding-left: 15px;
-        }
-        ul li {
-          list-style-type: disc !important;
-        }
-        ol li {
-          list-style-type: decimal !important;
-        }
-        li {
-          margin: 10px;
-        }
-        li p {
-          margin: 0px 0 10px 0 !important;
-        }
-        ul ul,
-        ul ol,
-        ol ul,
-        ol ol {
-          margin: 0;
-          padding-left: 20px; // 增加嵌套列表的缩进
-        }
-        ul ul li {
-          list-style-type: circle !important; // 二级无序列表使用空心圆点
-        }
-        ul ul ul li {
-          list-style-type: square !important; // 三级无序列表使用方块
-        }
-        ol ol li {
-          list-style-type: lower-alpha !important; // 二级有序列表使用小写字母
-        }
-        ol ol ol li {
-          list-style-type: lower-roman !important; // 三级有序列表使用小写罗马数字
-        }
+        @include markdown-github-content;
       }
     }
     /*滚动条宽度*/

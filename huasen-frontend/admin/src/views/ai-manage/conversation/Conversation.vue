@@ -18,9 +18,12 @@
       :showEdit="false"
       :showDetail="true"
       :showRemove="true"
+      :showSelection="true"
+      :showRemoveMany="true"
       :operationWidth="180"
       @detail="handleDetail"
       @remove="handleRemove"
+      @removeMany="handleRemoveMany"
       @search="queryData"
       @paginationChange="paginationChange"
       @updatePagination="updatePagination"
@@ -34,6 +37,7 @@
           <el-descriptions-item label="标题">{{ currentConversation.title || '-' }}</el-descriptions-item>
           <el-descriptions-item label="来源">{{ currentConversation.source || '-' }}</el-descriptions-item>
           <el-descriptions-item label="应用ID">{{ currentConversation.appId || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="知识包">{{ getKnowledgePackText(currentConversation) }}</el-descriptions-item>
           <el-descriptions-item label="消息数">{{ currentConversation.messageCount || 0 }}</el-descriptions-item>
           <el-descriptions-item label="创建时间">{{ formatDate(currentConversation.creatTime) }}</el-descriptions-item>
           <el-descriptions-item label="最后消息">{{ formatDate(currentConversation.lastMessageAt) }}</el-descriptions-item>
@@ -96,6 +100,7 @@ export default {
         { label: '标题', key: 'title' },
         { label: '用户ID', key: 'userId' },
         { label: '应用ID', key: 'appId' },
+        { label: '知识包', key: 'knowledgePackText' },
         { label: '来源', key: 'source' },
         { label: '消息数', key: 'messageCount' },
         { label: '最后消息', key: 'lastMessageAt' },
@@ -135,7 +140,10 @@ export default {
       let formData = this.$refs.tableList.getFormData();
       let params = Object.assign({ pageNo: this.pageNo, pageSize: this.pageSize }, formData);
       this.API.ai.findManageConversationByPage(params, { notify: false }).then(res => {
-        this.tableData = res.data.list || [];
+        this.tableData = (res.data.list || []).map(item => ({
+          ...item,
+          knowledgePackText: this.getKnowledgePackText(item),
+        }));
         this.total = res.data.total || 0;
       });
     },
@@ -164,6 +172,22 @@ export default {
         this.queryData();
       });
     },
+    handleRemoveMany(selection) {
+      if (!selection || selection.length === 0) {
+        this.$message.warning('请选择要删除的会话');
+        return;
+      }
+      const _ids = selection.map(item => item._id);
+      this.API.ai
+        .removeManyManageConversation({ _ids })
+        .then(() => {
+          // this.$message.success('批量删除成功');
+          this.queryData();
+        })
+        .catch(() => {
+          // this.$message.error('批量删除失败');
+        });
+    },
     closeDetail() {
       this.showDetail = false;
       this.currentConversation = null;
@@ -177,6 +201,10 @@ export default {
       if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(2)} MB`;
       if (value >= 1024) return `${(value / 1024).toFixed(2)} KB`;
       return `${value} B`;
+    },
+    getKnowledgePackText(conversation) {
+      const names = conversation && Array.isArray(conversation.knowledgePackNames) ? conversation.knowledgePackNames : [];
+      return names.length ? names.join('、') : '--';
     },
   },
 };

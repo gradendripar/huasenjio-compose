@@ -40,6 +40,7 @@ mountSEORoutes(app);
 
 // 配置静态资源目录
 app.use('/public', express.static(path.join(__dirname, './public')), (req, res) => res.status(404).end());
+app.use('/bin', express.static(path.join(__dirname, '../bin')), (req, res) => res.status(404).end());
 app.use('/huasen-store', express.static(path.join(__dirname, '../huasen-store')), (req, res) => res.status(404).end());
 
 // 全局拦截

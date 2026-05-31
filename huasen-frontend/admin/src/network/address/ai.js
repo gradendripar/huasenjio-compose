@@ -49,6 +49,20 @@ const presetORM = Mock.mock({
   sort: '@integer(0,10)',
 });
 
+const knowledgePackORM = Mock.mock({
+  _id: '@id',
+  name: '@ctitle(2,4)',
+  description: '@cparagraph(1,2)',
+  appIds: [],
+  articleIds: ['@id'],
+  appNames: [],
+  articleTitles: ['@ctitle(6,12)'],
+  code: '@integer(0,3)',
+  maxArticles: 5,
+  maxKnowledgeChars: 100000,
+  enabled: true,
+});
+
 const conversationORM = Mock.mock({
   _id: '@id',
   userId: '@id',
@@ -113,6 +127,12 @@ const addPreset = post('/ai/manage/preset/add', { code: 200, data: [presetORM], 
 const updatePreset = post('/ai/manage/preset/update', { code: 200, data: presetORM, msg: '请求成功' }, false);
 const removePreset = post('/ai/manage/preset/remove', { code: 200, data: null, msg: '请求成功' }, false);
 
+const findKnowledgePackByList = post('/ai/manage/knowledge-pack/list', { code: 200, data: [knowledgePackORM], msg: '请求成功' }, false);
+const findKnowledgePackByPage = post('/ai/manage/knowledge-pack/findByPage', { code: 200, data: { list: [knowledgePackORM], total: 1 }, msg: '请求成功' }, false);
+const addKnowledgePack = post('/ai/manage/knowledge-pack/add', { code: 200, data: [knowledgePackORM], msg: '请求成功' }, false);
+const updateKnowledgePack = post('/ai/manage/knowledge-pack/update', { code: 200, data: knowledgePackORM, msg: '请求成功' }, false);
+const removeKnowledgePack = post('/ai/manage/knowledge-pack/remove', { code: 200, data: null, msg: '请求成功' }, false);
+
 const findUserAppList = post('/ai/user/app/list', { code: 200, data: [appORM], msg: '请求成功' }, false);
 const findConversationByPage = post('/ai/user/conversation/findByPage', { code: 200, data: { list: [], total: 0 }, msg: '请求成功' }, false);
 const createConversation = post('/ai/user/conversation/create', { code: 200, data: [], msg: '请求成功' }, false);
@@ -121,6 +141,7 @@ const removeConversation = post('/ai/user/conversation/remove', { code: 200, dat
 const findManageConversationByPage = post('/ai/manage/conversation/findByPage', { code: 200, data: { list: [conversationORM], total: 1 }, msg: '请求成功' }, false);
 const findManageMessageByConversation = post('/ai/manage/message/findByConversation', { code: 200, data: [messageORM], msg: '请求成功' }, false);
 const removeManageConversation = post('/ai/manage/conversation/remove', { code: 200, data: null, msg: '请求成功' }, false);
+const removeManyManageConversation = post('/ai/manage/conversation/removeMany', { code: 200, data: null, msg: '请求成功' }, false);
 const userChat = post('/ai/user/chat', { code: 200, data: {}, msg: '请求成功' }, false);
 
 const getAcceptTypes = post('/ai/manage/acceptTypes', { code: 200, data: {}, msg: '请求成功' }, false);
@@ -192,6 +213,11 @@ export {
   addPreset,
   updatePreset,
   removePreset,
+  findKnowledgePackByList,
+  findKnowledgePackByPage,
+  addKnowledgePack,
+  updateKnowledgePack,
+  removeKnowledgePack,
   findUserAppList,
   findConversationByPage,
   createConversation,
@@ -200,6 +226,7 @@ export {
   findManageConversationByPage,
   findManageMessageByConversation,
   removeManageConversation,
+  removeManyManageConversation,
   userChat,
   getAcceptTypes,
   activateLicense,

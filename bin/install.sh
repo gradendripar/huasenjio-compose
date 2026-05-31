@@ -8,8 +8,8 @@ project_path=$(cd "$(dirname "$0")" && pwd)
 source "$project_path/env-lib.sh"
 
 # git 仓库
-git_path="https://gitee.com/HuaSenJioJio/huasenjio-compose.git"
-git_name="huasenjio-compose"
+git_path="$DEFAULT_GIT_REPO"
+git_name="$(get_git_repo_name "$git_path")"
 
 # docker 镜像文件及镜像源
 daemon_file="/etc/docker/daemon.json"
@@ -297,9 +297,12 @@ configure_environment() {
 # 拉取代码
 pull_code() {
     echo '[Huasen Log]：正在拉取代码...'
+    select_git_repo "$project_path/.env" "git_path" 30
+    git_name="$(get_git_repo_name "$git_path")"
+    log_info "源码目录名: $git_name"
     cd "$project_path"
     rm -rf "$git_name"
-    git clone "$git_path"
+    git clone "$git_path" "$git_name"
     cd "$git_name"
 }
 

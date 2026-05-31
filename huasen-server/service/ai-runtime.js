@@ -4,7 +4,7 @@ const { schemaMap, working } = require('./index.js');
 const { invokeProvider, invokeProviderStream } = require('./ai-provider-adapters/index.js');
 const { buildProviderMessages, resolveCapabilities } = require('./ai-provider-adapters/message-builder.js');
 
-const { aiProvider, aiApp, aiPreset, aiConversation, aiMessage, aiAttachment } = schemaMap;
+const { aiProvider, aiApp, aiPreset, aiKnowledgePack, aiConversation, aiMessage, aiAttachment, article } = schemaMap;
 
 const activeStreamMap = new Map();
 
@@ -27,6 +27,49 @@ function normalizeMessageContent(text = '') {
   return String(text || '').replace(/\r\n/g, '\n');
 }
 
+const MARKDOWN_OUTPUT_INSTRUCTION = [
+  '输出 Markdown 时遵循 CommonMark 围栏代码块规则，如果需要在 markdown/md 代码块里展示其他代码块，外层围栏必须比内部更长，例如：使用 ````markdown 包裹内部 ```html，请你务必遵守这个规则，否则可能导致解析错误。',
+].join('\n');
+
+function stripKnowledgeContent(content = '') {
+  return String(content || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[#>*`~\-\[\]()]/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map(item => String(item || '')).filter(Boolean);
+}
+
+function buildKnowledgePackAppQuery(appId) {
+  return {
+    $or: [{ appIds: { $size: 0 } }, { appIds: appId }],
+  };
+}
+
+function resolveSelectedKnowledgePackIds({ conversation, knowledgePackIds = [] }) {
+  const conversationKnowledgePackIds = normalizeStringArray(_.get(conversation, 'knowledgePackIds') || []);
+  if (conversationKnowledgePackIds.length) {
+    const requestedIds = normalizeStringArray(knowledgePackIds);
+    const requestedChanged =
+      requestedIds.length && (requestedIds.length !== conversationKnowledgePackIds.length || requestedIds.some(id => !conversationKnowledgePackIds.includes(id)));
+    if (requestedChanged) {
+      throw new Error('当前会话已绑定知识包，不能重新选择！');
+    }
+    return conversationKnowledgePackIds;
+  }
+  return normalizeStringArray(knowledgePackIds);
+}
+
 function normalizeResponseFormat(responseFormat) {
   if (!responseFormat) return null;
   if (typeof responseFormat === 'string') {
@@ -40,6 +83,12 @@ function getContentTypeByResponseFormat(responseFormat) {
   const normalized = normalizeResponseFormat(responseFormat);
   if (!normalized) return 'text';
   return normalized.type === 'json_object' ? 'json-object' : 'text';
+}
+
+function shouldAppendMarkdownOutputInstruction(preset) {
+  const params = parseJSON(_.get(preset, 'params', '{}'), {});
+  const responseFormat = normalizeResponseFormat(_.get(params, 'response_format'));
+  return !responseFormat || responseFormat.type !== 'json_object';
 }
 
 function mergeParams(...params) {
@@ -123,6 +172,72 @@ async function resolveChatContext({ userId, userCode = 0, appId, presetId, conve
   };
 }
 
+async function buildKnowledgeContext({ userCode = 0, appId, conversation, knowledgePackIds = [] }) {
+  const ids = resolveSelectedKnowledgePackIds({ conversation, knowledgePackIds });
+  if (!ids.length) return '';
+  const packs = await aiKnowledgePack
+    .find({
+      _id: { $in: ids },
+      enabled: true,
+      code: { $lte: normalizePermissionCode(userCode) },
+      ...buildKnowledgePackAppQuery(appId),
+    })
+    .sort({ _id: -1 });
+  if (!packs.length) return '';
+  const articleIds = [];
+  let maxArticles = 0;
+  let maxKnowledgeChars = 0;
+  packs.forEach(pack => {
+    maxArticles += Math.max(1, Number(pack.maxArticles) || 5);
+    maxKnowledgeChars += Math.max(1000, Number(pack.maxKnowledgeChars) || 100000);
+    (pack.articleIds || []).forEach(id => {
+      if (!articleIds.includes(String(id))) {
+        articleIds.push(String(id));
+      }
+    });
+  });
+  if (!articleIds.length) return '';
+  const articles = await article
+    .find({
+      _id: { $in: articleIds },
+      code: { $lte: normalizePermissionCode(userCode) },
+      isDraft: false,
+    })
+    .sort({ updateTime: -1, _id: -1 })
+    .limit(Math.max(1, maxArticles || 5));
+  if (!articles.length) return '';
+  const limit = Math.max(1000, maxKnowledgeChars || 100000);
+  let usedChars = 0;
+  const blocks = [];
+  articles.forEach((item, index) => {
+    if (usedChars >= limit) return;
+    const text = stripKnowledgeContent(item.content || '');
+    if (!text) return;
+    const header = `[资料 ${index + 1}]\n标题：${item.title || ''}\n标签：${item.tag || ''}\n内容：\n`;
+    const remain = limit - usedChars - header.length;
+    if (remain <= 0) return;
+    const body = text.length > remain ? `${text.slice(0, Math.max(0, remain - 3))}...` : text;
+    const block = `${header}${body}`;
+    usedChars += block.length;
+    blocks.push(block);
+  });
+  if (!blocks.length) return '';
+  return `以下是系统预置的参考资料，回答问题前，务必判断用户提问内容和资料的相关性。如果资料与问题相关，回答时优先依据其内容；如果资料不足，请明确说明不足，禁止编造；如果资料和问题无关，请忽略资料。\n\n${blocks.join('\n\n')}`;
+}
+
+async function resolveEffectiveKnowledgePackIds({ userCode = 0, appId, conversation, knowledgePackIds = [] }) {
+  const ids = resolveSelectedKnowledgePackIds({ conversation, knowledgePackIds });
+  if (!ids.length) return [];
+  const packs = await aiKnowledgePack.find({
+    _id: { $in: ids },
+    enabled: true,
+    code: { $lte: normalizePermissionCode(userCode) },
+    ...buildKnowledgePackAppQuery(appId),
+  });
+  const availableIds = packs.map(item => String(item._id));
+  return ids.filter(id => availableIds.includes(String(id)));
+}
+
 function validateAttachmentCapabilities({ provider, preset, attachments }) {
   if (!attachments.length) return;
   if (!preset) {
@@ -147,7 +262,7 @@ function validateAttachmentCapabilities({ provider, preset, attachments }) {
   }
 }
 
-async function buildRuntimeMessages({ conversationId, app, preset, attachments, content }) {
+async function buildRuntimeMessages({ userCode = 0, conversationId, app, preset, conversation, knowledgePackIds = [], attachments, content }) {
   const history = conversationId ? await aiMessage.find({ conversationId, enabled: true }).sort({ creatTime: 1 }) : [];
   const attachmentMap = {};
   history.forEach(item => {
@@ -166,6 +281,13 @@ async function buildRuntimeMessages({ conversationId, app, preset, attachments, 
   const systemMessageText = sanitizeText(_.get(preset, 'promptTemplate') || '');
   if (systemMessageText) {
     runtimeMessages.push({ role: 'system', content: systemMessageText, attachments: [] });
+  }
+  if (shouldAppendMarkdownOutputInstruction(preset)) {
+    runtimeMessages.push({ role: 'system', content: MARKDOWN_OUTPUT_INSTRUCTION, attachments: [] });
+  }
+  const knowledgeContextText = await buildKnowledgeContext({ userCode, appId: String(app._id), conversation, knowledgePackIds });
+  if (knowledgeContextText) {
+    runtimeMessages.push({ role: 'system', content: knowledgeContextText, attachments: [] });
   }
   recentHistory.forEach(item => {
     runtimeMessages.push({
@@ -236,14 +358,18 @@ async function buildProviderPayload({ provider, app, preset, runtimeMessages, re
   return payload;
 }
 
-async function prepareChatRuntime({ userId, userCode = 0, appId, presetId, conversationId, content, attachmentIds = [], requestParams = {} }) {
+async function prepareChatRuntime({ userId, userCode = 0, appId, presetId, conversationId, content, attachmentIds = [], knowledgePackIds = [], requestParams = {} }) {
   const context = await resolveChatContext({ userId, userCode, appId, presetId, conversationId, attachmentIds });
   const { app, provider, preset, attachments } = context;
   validateAttachmentCapabilities({ provider, preset, attachments });
+  const effectiveKnowledgePackIds = await resolveEffectiveKnowledgePackIds({ userCode, appId: String(app._id), conversation: context.conversation, knowledgePackIds });
   const runtimeMessages = await buildRuntimeMessages({
+    userCode,
     conversationId,
     app,
     preset,
+    conversation: context.conversation,
+    knowledgePackIds: effectiveKnowledgePackIds,
     attachments,
     content,
   });
@@ -256,6 +382,7 @@ async function prepareChatRuntime({ userId, userCode = 0, appId, presetId, conve
   });
   return {
     ...context,
+    knowledgePackIds: effectiveKnowledgePackIds,
     runtimeMessages,
     payload,
     assistantContentType: getContentTypeByResponseFormat(payload.response_format),
@@ -320,6 +447,7 @@ async function persistConversationSkeleton({
   conversationId,
   conversation,
   source = 'portal',
+  knowledgePackIds = [],
   content,
   attachmentIds = [],
   attachments = [],
@@ -341,6 +469,7 @@ async function persistConversationSkeleton({
             userId,
             appId,
             presetId: _.get(preset, '_id', ''),
+            knowledgePackIds,
             title: currentTitle,
             summary: '',
             source: conversationSource,
@@ -352,14 +481,15 @@ async function persistConversationSkeleton({
       ],
     });
   } else {
+    const conversationKnowledgePackIds = normalizeStringArray(_.get(conversation, 'knowledgePackIds') || []);
+    const updateSet = { lastMessageAt: now, presetId: _.get(preset, '_id', ''), title: _.get(conversation, 'title') || currentTitle };
+    if (!conversationKnowledgePackIds.length && knowledgePackIds.length) {
+      updateSet.knowledgePackIds = knowledgePackIds;
+    }
     works.push({
       schemaName: 'aiConversation',
       methodName: 'updateOne',
-      payloads: [
-        { _id: ids.currentConversationId },
-        { $set: { lastMessageAt: now, presetId: _.get(preset, '_id', ''), title: _.get(conversation, 'title') || currentTitle }, $inc: { messageCount: 2 } },
-        { runValidators: true },
-      ],
+      payloads: [{ _id: ids.currentConversationId }, { $set: updateSet, $inc: { messageCount: 2 } }, { runValidators: true }],
     });
   }
   works.push(
@@ -502,7 +632,7 @@ async function finalizeAssistantMessageStopped({ conversationId, assistantMessag
   return aiMessage.findById(assistantMessageId);
 }
 
-async function chat({ userId, userCode = 0, appId, presetId, conversationId, content, attachmentIds = [], requestParams = {}, source = 'portal' }) {
+async function chat({ userId, userCode = 0, appId, presetId, conversationId, content, attachmentIds = [], knowledgePackIds = [], requestParams = {}, source = 'portal' }) {
   const prepared = await prepareChatRuntime({
     userId,
     userCode,
@@ -511,6 +641,7 @@ async function chat({ userId, userCode = 0, appId, presetId, conversationId, con
     conversationId,
     content,
     attachmentIds,
+    knowledgePackIds,
     requestParams,
   });
   const assistant = await invokeProvider(prepared.provider, prepared.payload);
@@ -524,6 +655,7 @@ async function chat({ userId, userCode = 0, appId, presetId, conversationId, con
     conversationId,
     conversation: prepared.conversation,
     source,
+    knowledgePackIds: prepared.knowledgePackIds,
     content,
     attachmentIds,
     attachments: prepared.attachments,
@@ -552,6 +684,7 @@ async function chatStream({
   conversationId,
   content,
   attachmentIds = [],
+  knowledgePackIds = [],
   requestParams = {},
   source = 'portal',
   registerAbort,
@@ -570,6 +703,7 @@ async function chatStream({
     conversationId,
     content,
     attachmentIds,
+    knowledgePackIds,
     requestParams,
   });
   const ids = buildPersistIds(conversationId);
@@ -589,6 +723,7 @@ async function chatStream({
     conversationId,
     conversation: prepared.conversation,
     source,
+    knowledgePackIds: prepared.knowledgePackIds,
     content,
     attachmentIds,
     attachments: prepared.attachments,

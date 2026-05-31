@@ -14,7 +14,8 @@ async function copyFiles(srcPath, destPath) {
     filter: (src) => {
       return (
         !src.includes("node_modules") &&
-        !src.includes(".git")
+        !src.includes(".git") &&
+        !src.includes(".DS_Store")
       );
     },
   });

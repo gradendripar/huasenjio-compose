@@ -86,7 +86,6 @@ export default {
         zip: '压缩文件',
         article: '文章附件',
         banner: '文章封面',
-        'open-sh': '开放脚本',
       },
       type2icon: {
         png: 'icon-PNG',

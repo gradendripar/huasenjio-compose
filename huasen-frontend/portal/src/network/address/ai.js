@@ -6,6 +6,7 @@ const isDev = process.env.NODE_ENV === 'development';
 const chatStreamUrl = isDev ? 'http://localhost:3000/ai/user/chat/stream' : `${Config.baseURL}/ai/user/chat/stream`;
 
 const findEnabledApps = post('/ai/user/app/list');
+const findKnowledgePackList = post('/ai/user/knowledge-pack/list');
 const findConversationByPage = post('/ai/user/conversation/findByPage');
 const createConversation = post('/ai/user/conversation/create');
 const findMessageByConversation = post('/ai/user/message/findByConversation');
@@ -16,6 +17,7 @@ const getAcceptTypes = get('/ai/manage/acceptTypes');
 
 export default {
   findEnabledApps,
+  findKnowledgePackList,
   findConversationByPage,
   createConversation,
   findMessageByConversation,
